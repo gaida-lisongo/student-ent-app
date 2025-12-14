@@ -1,0 +1,48 @@
+
+name: Flutter Build & Deploy to APK
+
+# Déclenche ce workflow à chaque 'push' sur la branche 'main'
+on:
+  push:
+    branches: 
+      - "*"
+  pull_request:
+    branches: 
+      - "*"
+
+jobs:
+  build:
+    # Définit l'environnement de la machine virtuelle : ici, Windows est le plus universel
+    runs-on: ubuntu-latest 
+
+    steps:
+      # 1. Checkout (Récupère le code)
+      - uses: actions/checkout@v4
+
+      # 2. Setup Java (Nécessaire pour le SDK Android et Gradle)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17' # Version moderne standard
+
+      # 3. Setup Flutter (Utilise un action pré-faite)
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.6' # Mettez votre version stable actuelle
+          channel: 'stable'
+
+      # 4. Obtenir les dépendances
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      # 5. Build l'APK en mode Release (le plus critique)
+      - name: Build Flutter APK (Release)
+        run: flutter build apk --release
+
+      # 6. Upload de l'APK (Pour pouvoir le télécharger)
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk 
+          # Le chemin où 'flutter build apk' stocke le fichier
