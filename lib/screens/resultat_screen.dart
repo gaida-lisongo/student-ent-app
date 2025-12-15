@@ -122,7 +122,7 @@ class _ResultatScreenState extends State<ResultatScreen> {
   String _getCardImagePath(int index) {
     final int imageNumber = (index % 3) + 1;
     // J'ai corrigé le chemin ici, en supposant que "images" est le sous-dossier de "assets"
-    return 'images/check-$imageNumber.jpg';
+    return 'assets/images/check-$imageNumber.jpg';
   }
 
   // 1. Carte de Commande de Bulletin (Section Horizontale)
