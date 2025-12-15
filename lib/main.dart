@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:student_app/screens/dashboard_screen.dart';
 import 'package:student_app/screens/profile_screen.dart';
 import 'package:student_app/screens/resultat_screen.dart';
+import 'package:student_app/screens/welcome_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,7 +21,10 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Student App Home'),
+      routes: {
+        '/dashboard': (context) => MyHomePage(title: 'Student App Home'),
+      },
+      home: const WelcomeScreen(),
     );
   }
 }
