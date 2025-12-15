@@ -168,6 +168,33 @@ class UserRechargesNotifier
       state = AsyncValue.data(updatedList);
     }
   }
+
+  // Mise à jour locale après MODIFICATION (ex: changement d'orderNumber, de statut, ou de montant)
+  void updateTransaction(Transaction updatedTransaction) {
+    if (state.hasValue) {
+      final List<Transaction> currentList = state.value!;
+
+      // Trouver l'index de l'ancienne transaction
+      final index = currentList.indexWhere(
+        (t) => t.id == updatedTransaction.id,
+      );
+
+      if (index != -1) {
+        // Créer une nouvelle liste avec la transaction mise à jour à l'index trouvé
+        final updatedList = List<Transaction>.from(currentList);
+        updatedList[index] = updatedTransaction;
+
+        // Mettre à jour l'état
+        state = AsyncValue.data(updatedList);
+      } else {
+        // Optionnel: Si la transaction n'est pas trouvée, vous pouvez choisir de la logguer
+        // ou de déclencher un rafraîchissement complet si la liste est potentiellement obsolète.
+        print(
+          'Transaction non trouvée dans l\'état local pour la mise à jour: ${updatedTransaction.id}',
+        );
+      }
+    }
+  }
 }
 
 // ----------------------------------------------------
@@ -260,7 +287,7 @@ final deleteRechargeActionProvider = Provider((ref) {
   return deleteRecharge;
 });
 
-// Le Provider pour effectuer le paiement d'une recharge
+// ... (Le Provider pour effectuer le paiement d'une recharge)
 final payRechargeActionProvider = Provider((ref) {
   final transactionService = ref.watch(transactionServiceProvider);
 
@@ -269,12 +296,28 @@ final payRechargeActionProvider = Provider((ref) {
     required Map<String, dynamic> transactionData,
   }) async {
     try {
+      // 1. Appeler le service API (qui fait le PUT)
       final transaction = await transactionService.payRecharge(
         rechargeId: rechargeId,
         transactionData: transactionData,
       );
 
       print('✅ Paiement effectué: $rechargeId');
+      print(
+        'Détails de la transaction mis à jour (incluant nouvel orderNumber): ${transaction.orderNumber}',
+      );
+
+      // 2. Récupérer l'ID de l'étudiant pour accéder au Notifier
+      // Assurez-vous d'avoir l'ID de l'étudiant, soit de transactionData, soit via authProvider
+      // Nous allons utiliser la méthode recommandée par Riverpod: lire le provider d'auth.
+      final etudiantId = ref.read(authProvider).user!.etudiant.id;
+
+      // 3. Mettre à jour l'état local IMMÉDIATEMENT via le Notifier
+      // La 'transaction' retournée par l'API contient désormais l'orderNumber mis à jour.
+      ref
+          .read(userRechargesNotifierProvider(etudiantId).notifier)
+          .updateTransaction(transaction); // Utilisation de la nouvelle méthode
+
       return transaction;
     } catch (e) {
       print('❌ Erreur paiement: $e');
@@ -286,6 +329,23 @@ final payRechargeActionProvider = Provider((ref) {
 });
 
 // Le Provider pour vérifier le statut d'une recharge
+// final checkRechargeStatusActionProvider = Provider((ref) {
+//   final transactionService = ref.watch(transactionServiceProvider);
+
+//   Future<RechargeStatus> checkStatus(String orderNumber) async {
+//     try {
+//       final status = await transactionService.checkRechargeStatus(orderNumber);
+//       print('✅ Statut vérifié: ${status.status}');
+//       return status;
+//     } catch (e) {
+//       print('❌ Erreur vérification: $e');
+//       rethrow;
+//     }
+//   }
+
+//   return checkStatus;
+// });
+// Le Provider pour vérifier le statut d'une recharge
 final checkRechargeStatusActionProvider = Provider((ref) {
   final transactionService = ref.watch(transactionServiceProvider);
 
@@ -293,6 +353,21 @@ final checkRechargeStatusActionProvider = Provider((ref) {
     try {
       final status = await transactionService.checkRechargeStatus(orderNumber);
       print('✅ Statut vérifié: ${status.status}');
+
+      // Logique critique: Si la vérification indique succès, forcez la mise à jour du Notifier
+      // Le backend est censé mettre à jour le statut de la transaction et créditer le compte.
+      if (status.status == 'SUCCESS' ||
+          status.status == 'PAID' ||
+          status.status == 'completed') {
+        // Adaptez le statut
+        final etudiantId = ref.read(authProvider).user!.etudiant.id;
+        // Rafraîchir la liste complète des transactions et le solde
+        ref
+            .read(userRechargesNotifierProvider(etudiantId).notifier)
+            .fetchRecharges();
+        // ref.invalidate(balanceProvider); // Si vous avez un provider de solde
+      }
+
       return status;
     } catch (e) {
       print('❌ Erreur vérification: $e');
