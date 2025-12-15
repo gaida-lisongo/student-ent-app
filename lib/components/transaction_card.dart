@@ -104,7 +104,7 @@ class TransactionCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  transaction.dateCreated,
+                  transaction.createdAt.toString().split('.')[0],
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],

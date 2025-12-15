@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/components/button_row.dart';
 import 'package:student_app/components/transaction_card.dart';
+import 'package:student_app/components/recharge_bottom_sheet.dart';
 import 'package:student_app/model/student_model.dart';
 import 'package:student_app/model/transaction_model.dart'; // MAINTENU
 import 'package:student_app/stores/autth_provider.dart'; // Importer le provider d'auth
+import 'package:student_app/stores/transaction_provider.dart'; // Importer le provider de transaction
 
 // 1. Service d'Avatar Simulé (inchangé)
 class AvatarService {
@@ -21,67 +23,13 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  // Données utilisateur à afficher
-  final String userId = '123456';
-  final String userName = 'John Doe';
-  final String memberSince = 'Membre depuis 2020';
-
-  // Mock transactions list
-  late List<Transaction> _transactions;
-
   final String cardBackgroundImageUrl =
       'https://images.unsplash.com/photo-1557683316-92c18d2d6695?q=80&w=1500&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D';
 
   @override
   void initState() {
     super.initState();
-    _transactions = [
-      Transaction(
-        id: '1',
-        orderNumber: 'ORD-001',
-        dateCreated: '2025-12-15 10:30',
-        amount: 5000,
-        currency: 'FC',
-        status: 'completed',
-        phone: '+243812345678',
-      ),
-      Transaction(
-        id: '2',
-        orderNumber: 'ORD-002',
-        dateCreated: '2025-12-14 14:20',
-        amount: 2500,
-        currency: 'FC',
-        status: 'pending',
-        phone: '+243987654321',
-      ),
-      Transaction(
-        id: '3',
-        orderNumber: 'ORD-003',
-        dateCreated: '2025-12-13 09:15',
-        amount: 3000,
-        currency: 'FC',
-        status: 'ok',
-        phone: '+243812111222',
-      ),
-      Transaction(
-        id: '4',
-        orderNumber: 'ORD-004',
-        dateCreated: '2025-12-12 16:45',
-        amount: 1500,
-        currency: 'FC',
-        status: 'no',
-        phone: '+243833333333',
-      ),
-      Transaction(
-        id: '5',
-        orderNumber: 'ORD-005',
-        dateCreated: '2025-12-11 11:00',
-        amount: 6000,
-        currency: 'FC',
-        status: 'completed',
-        phone: '+243844444444',
-      ),
-    ];
+    // Les transactions seront chargées via Riverpod dans transactionsList()
   }
 
   @override
@@ -141,20 +89,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
       ),
     );
-    setState(() {
-      final index = _transactions.indexWhere((t) => t.id == transaction.id);
-      if (index != -1) {
-        _transactions[index] = Transaction(
-          id: transaction.id,
-          orderNumber: transaction.orderNumber,
-          dateCreated: transaction.dateCreated,
-          amount: transaction.amount,
-          currency: transaction.currency,
-          status: 'completed', // Changement de statut simulé
-          phone: transaction.phone,
-        );
-      }
-    });
+    // La mise à jour sera faite via l'API
   }
 
   // Créditer le solde (ok)
@@ -166,11 +101,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
       ),
     );
-    setState(() {
-      _transactions.removeWhere(
-        (t) => t.id == transaction.id,
-      ); // Suppression simulée
-    });
+    // La mise à jour sera faite via l'API
   }
 
   // Supprimer la transaction (no)
@@ -178,11 +109,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Transaction supprimée')));
-    setState(() {
-      _transactions.removeWhere(
-        (t) => t.id == transaction.id,
-      ); // Suppression simulée
-    });
+    // La suppression sera faite via l'API
   }
 
   // Afficher les détails dans une bottom sheet (completed)
@@ -217,13 +144,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const SizedBox(height: 20),
               _buildDetailRow('ID Transaction:', transaction.id),
               _buildDetailRow('Numéro de Commande:', transaction.orderNumber),
-              _buildDetailRow('Date:', transaction.dateCreated),
+              _buildDetailRow(
+                'Date:',
+                transaction.createdAt.toString().split('.')[0],
+              ),
               _buildDetailRow(
                 'Montant:',
                 '${transaction.amount} ${transaction.currency}',
               ),
               _buildDetailRow('Téléphone:', transaction.phone),
               _buildDetailRow('Statut:', transaction.status),
+              _buildDetailRow(
+                'Méthode de paiement:',
+                transaction.paymentMethod,
+              ),
+              _buildDetailRow('Description:', transaction.description),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
@@ -284,7 +219,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.0),
           child: Text(
-            'Transactions Récentes',
+            'Recharges Récentes',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -293,19 +228,56 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        // Utiliser la méthode map() pour générer dynamiquement les TransactionCard
-        ..._transactions.map((transaction) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: TransactionCard(
-              transaction: transaction,
-              onPayment: () => _handlePayment(transaction),
-              onCredit: () => _handleCredit(transaction),
-              onDelete: () => _handleDelete(transaction),
-              onDetails: () => _showTransactionDetails(transaction),
-            ),
-          );
-        }).toList(),
+        // Charger les recharges via Riverpod
+        Consumer(
+          builder: (context, ref, child) {
+            final rechargesAsync = ref.watch(userRechargesProvider);
+
+            return rechargesAsync.when(
+              data: (transactions) {
+                if (transactions.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Center(
+                      child: Text(
+                        'Aucune recharge trouvée',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: transactions.map((transaction) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: TransactionCard(
+                        transaction: transaction,
+                        onPayment: () => _handlePayment(transaction),
+                        onCredit: () => _handleCredit(transaction),
+                        onDelete: () => _handleDelete(transaction),
+                        onDetails: () => _showTransactionDetails(transaction),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (error, stackTrace) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Center(
+                  child: Text(
+                    'Erreur: $error',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
       ],
     );
   }
@@ -676,9 +648,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 leftButtonTitle: "Recharger",
                 leftButtonIcon: Icons.add,
                 leftButtonOnTap: () {
-                  print('Recharger tapped');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Recharge en cours...')),
+                  // Afficher la bottom sheet de recharge
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                    ),
+                    builder: (context) => const RechargeBottomSheet(),
                   );
                 },
                 rightButtonTitle: "Historique",
