@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 // Assurez-vous que ces chemins d'importation sont corrects pour vos fichiers
 import 'package:student_app/screens/dashboard_screen.dart';
 import 'package:student_app/screens/profile_screen.dart';
-import 'package:student_app/screens/recharge_screen.dart';
+import 'package:student_app/screens/resultat_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -152,7 +152,7 @@ class _MyHomePageState extends State<MyHomePage> {
             },
             // Assurez-vous que ProfileScreen, DashboardScreen, RechargeScreen
             // sont bien importés et définis (comme vous l'avez fait)
-            children: [ProfileScreen(), DashboardScreen(), RechargeScreen()],
+            children: [ProfileScreen(), DashboardScreen(), ResultatScreen()],
           ),
 
           // 2. La Bottom Navigation Bar Flottante
