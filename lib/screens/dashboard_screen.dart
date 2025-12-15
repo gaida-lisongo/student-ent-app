@@ -81,15 +81,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // --- WIDGETS DE TRAITEMENT DES TRANSACTIONS (Logique inchangée depuis la correction précédente) ---
 
   // Gérer le paiement (pending)
-  void _handlePayment(Transaction transaction) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Paiement de ${transaction.amount} ${transaction.currency} en cours...',
-        ),
-      ),
-    );
-    // La mise à jour sera faite via l'API
+  void _handlePayment(Transaction transaction) async {
+    try {
+      final payAction = ref.read(payRechargeActionProvider);
+
+      await payAction(
+        rechargeId: transaction.id,
+        transactionData: {
+          'orderNumber': transaction.orderNumber,
+          'amount': transaction.amount,
+          'currency': transaction.currency,
+          'phone': transaction.phone,
+        },
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Paiement effectué'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   // Créditer le solde (ok)
@@ -104,13 +124,91 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     // La mise à jour sera faite via l'API
   }
 
-  // Supprimer la transaction (no)
-  void _handleDelete(Transaction transaction) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Transaction supprimée')));
-    // La suppression sera faite via l'API
+  // Supprimer la transaction (no et failed)
+  void _handleDelete(Transaction transaction) async {
+    final etudiantId = ref.read(authProvider).user!.etudiant.id;
+
+    // Lire la fonction d'action Riverpod
+    final deleteAction = ref.read(deleteRechargeActionProvider);
+
+    try {
+      // Appeler l'action qui gère l'API et la mise à jour du store local
+      await deleteAction(rechargeId: transaction.id, etudiantId: etudiantId);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Transaction supprimée')));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la suppression: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
+  // void _handleDelete(Transaction transaction) async {
+  //   final confirm = await showDialog<bool>(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('Confirmer la suppression'),
+  //       content: Text(
+  //         'Êtes-vous sûr de vouloir supprimer cette recharge de ${transaction.amount} ${transaction.currency}?',
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context, false),
+  //           child: const Text('Annuler'),
+  //         ),
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context, true),
+  //           child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+
+  //   if (confirm == true && mounted) {
+  //     try {
+  //       final authState = ref.read(authProvider);
+  //       final etudiantId = authState.user?.etudiant.id;
+
+  //       if (etudiantId == null) {
+  //         if (mounted) {
+  //           ScaffoldMessenger.of(context).showSnackBar(
+  //             const SnackBar(
+  //               content: Text('Erreur: Utilisateur non identifié'),
+  //             ),
+  //           );
+  //         }
+  //         return;
+  //       }
+
+  //       // Appeler le provider de suppression
+  //       await ref.read(
+  //         deleteRechargeProvider({
+  //           'rechargeId': transaction.id,
+  //           'etudiantId': etudiantId,
+  //         }).future,
+  //       );
+
+  //       if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(
+  //             content: Text('Recharge supprimée avec succès'),
+  //             backgroundColor: Colors.green,
+  //           ),
+  //         );
+  //       }
+  //     } catch (e) {
+  //       if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+  //         );
+  //       }
+  //     }
+  //   }
+  // }
 
   // Afficher les détails dans une bottom sheet (completed)
   void _showTransactionDetails(Transaction transaction) {
@@ -120,62 +218,130 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 50,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[400],
-                    borderRadius: BorderRadius.circular(3),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            bool isChecking = false;
+            String? checkStatus;
+
+            return Container(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 50,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[400],
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Détails de la Transaction',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              _buildDetailRow('ID Transaction:', transaction.id),
-              _buildDetailRow('Numéro de Commande:', transaction.orderNumber),
-              _buildDetailRow(
-                'Date:',
-                transaction.createdAt.toString().split('.')[0],
-              ),
-              _buildDetailRow(
-                'Montant:',
-                '${transaction.amount} ${transaction.currency}',
-              ),
-              _buildDetailRow('Téléphone:', transaction.phone),
-              _buildDetailRow('Statut:', transaction.status),
-              _buildDetailRow(
-                'Méthode de paiement:',
-                transaction.paymentMethod,
-              ),
-              _buildDetailRow('Description:', transaction.description),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Détails de la Transaction',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
-                  child: const Text(
-                    'Fermer',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  const SizedBox(height: 20),
+                  _buildDetailRow('ID Transaction:', transaction.id),
+                  _buildDetailRow(
+                    'Numéro de Commande:',
+                    transaction.orderNumber,
                   ),
-                ),
+                  _buildDetailRow(
+                    'Date:',
+                    transaction.createdAt.toString().split('.')[0],
+                  ),
+                  _buildDetailRow(
+                    'Montant:',
+                    '${transaction.amount} ${transaction.currency}',
+                  ),
+                  _buildDetailRow('Téléphone:', transaction.phone),
+                  _buildDetailRow('Statut:', transaction.status),
+                  _buildDetailRow(
+                    'Méthode de paiement:',
+                    transaction.paymentMethod,
+                  ),
+                  _buildDetailRow('Description:', transaction.description),
+                  if (checkStatus != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 20),
+                      child: Text(
+                        checkStatus!,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: checkStatus!.contains('succès')
+                              ? Colors.green
+                              : Colors.orange,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+                  if (transaction.status == 'pending')
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: isChecking
+                            ? null
+                            : () async {
+                                setState(() {
+                                  isChecking = true;
+                                  checkStatus = null;
+                                });
+                                try {
+                                  final checkAction = ref.read(
+                                    checkRechargeStatusActionProvider,
+                                  );
+                                  final status = await checkAction(
+                                    transaction.orderNumber,
+                                  );
+                                  setState(() {
+                                    checkStatus =
+                                        'Statut: ${status.status} - ${status.message}';
+                                  });
+                                } catch (e) {
+                                  setState(() {
+                                    checkStatus = 'Erreur: $e';
+                                  });
+                                } finally {
+                                  setState(() {
+                                    isChecking = false;
+                                  });
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: Text(
+                          isChecking
+                              ? 'Vérification...'
+                              : 'Vérifier le Paiement',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text(
+                        'Fermer',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -212,6 +378,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // --- WIDGET DE LISTE DES TRANSACTIONS (transactionList) ---
 
   Widget transactionsList() {
+    // 1. Lire l'ID de l'étudiant (à partir de votre AuthProvider)
+    final authState = ref.watch(authProvider);
+    final etudiantId = authState.user?.etudiant.id;
+
+    if (etudiantId == null) {
+      return const SizedBox.shrink(); // Ne rien afficher si non authentifié
+    }
+
+    // 2. Charger les recharges via le StateNotifierProvider.family
+    final rechargesAsync = ref.watch(userRechargesNotifierProvider(etudiantId));
     // Utilisation d'un Column pour le titre et la liste
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,54 +405,48 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
         const SizedBox(height: 12),
         // Charger les recharges via Riverpod
-        Consumer(
-          builder: (context, ref, child) {
-            final rechargesAsync = ref.watch(userRechargesProvider);
-
-            return rechargesAsync.when(
-              data: (transactions) {
-                if (transactions.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Center(
-                      child: Text(
-                        'Aucune recharge trouvée',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  );
-                }
-
-                return Column(
-                  children: transactions.map((transaction) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      child: TransactionCard(
-                        transaction: transaction,
-                        onPayment: () => _handlePayment(transaction),
-                        onCredit: () => _handleCredit(transaction),
-                        onDelete: () => _handleDelete(transaction),
-                        onDetails: () => _showTransactionDetails(transaction),
-                      ),
-                    );
-                  }).toList(),
-                );
-              },
-              loading: () => const Padding(
+        rechargesAsync.when(
+          data: (transactions) {
+            if (transactions.isEmpty) {
+              return const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.0),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (error, stackTrace) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Center(
                   child: Text(
-                    'Erreur: $error',
-                    style: const TextStyle(color: Colors.red),
+                    'Aucune recharge trouvée',
+                    style: TextStyle(color: Colors.grey),
                   ),
                 ),
-              ),
+              );
+            }
+
+            return Column(
+              children: transactions.map((transaction) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: TransactionCard(
+                    transaction: transaction,
+                    onPayment: () => _handlePayment(transaction),
+                    onCredit: () => _handleCredit(transaction),
+                    onDelete: () => _handleDelete(transaction),
+                    onDetails: () => _showTransactionDetails(transaction),
+                  ),
+                );
+              }).toList(),
             );
           },
+          loading: () => const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.0),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (error, stackTrace) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Center(
+              child: Text(
+                'Erreur: $error',
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          ),
         ),
       ],
     );

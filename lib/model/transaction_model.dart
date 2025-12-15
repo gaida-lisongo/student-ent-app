@@ -57,6 +57,26 @@ class Transaction {
   });
 
   factory Transaction.fromJson(Map<String, dynamic> json) {
+    // Gérer le cas où etudiantId est une String (juste l'ID)
+    EtudiantInfo etudiantInfo;
+    final etudiantIdValue = json['etudiantId'];
+
+    if (etudiantIdValue is Map<String, dynamic>) {
+      // C'est un objet complet
+      etudiantInfo = EtudiantInfo.fromJson(etudiantIdValue);
+    } else if (etudiantIdValue is String) {
+      // C'est juste l'ID, créer un objet avec juste l'ID
+      etudiantInfo = EtudiantInfo(
+        id: etudiantIdValue,
+        nom: '',
+        prenom: '',
+        matricule: '',
+      );
+    } else {
+      // Cas par défaut
+      etudiantInfo = EtudiantInfo(id: '', nom: '', prenom: '', matricule: '');
+    }
+
     return Transaction(
       id: json['_id'] as String? ?? '',
       currency: json['currency'] as String? ?? 'CDF',
@@ -64,9 +84,7 @@ class Transaction {
       amount: json['amount'] as int? ?? 0,
       description: json['description'] as String? ?? '',
       status: json['status'] as String? ?? 'pending',
-      etudiant: EtudiantInfo.fromJson(
-        json['etudiantId'] as Map<String, dynamic>? ?? {},
-      ),
+      etudiant: etudiantInfo,
       paymentMethod: json['paymentMethod'] as String? ?? 'mobile_money',
       orderNumber: json['orderNumber'] as String? ?? '',
       createdAt: json['createdAt'] != null

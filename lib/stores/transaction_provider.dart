@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:student_app/services/transaction_service.dart';
 import 'package:student_app/model/transaction_model.dart';
 import 'package:student_app/stores/autth_provider.dart';
@@ -62,8 +63,8 @@ final createRechargeProvider =
         paymentMethod: paymentMethod,
       );
 
-      // Invalider le cache des recharges après création
-      ref.invalidate(studentRechargesProvider(etudiantId));
+      // Rafraîchir les recharges pour une mise à jour fluide et immédiate
+      await ref.refresh(studentRechargesProvider(etudiantId).future);
 
       return transaction;
     });
@@ -99,3 +100,205 @@ final checkRechargeStatusProvider =
       final transactionService = ref.watch(transactionServiceProvider);
       return await transactionService.checkRechargeStatus(orderNumber);
     });
+
+// Provider pour supprimer une recharge
+final deleteRechargeProvider =
+    FutureProvider.family<void, Map<String, dynamic>>((ref, params) async {
+      final transactionService = ref.watch(transactionServiceProvider);
+      final rechargeId = params['rechargeId'] as String;
+      final etudiantId = params['etudiantId'] as String;
+
+      await transactionService.deleteRecharge(rechargeId);
+
+      // Rafraîchir la liste des recharges après suppression
+      await ref.refresh(studentRechargesProvider(etudiantId).future);
+    });
+
+// lib/stores/transaction_provider.dart
+
+// ... (Gardez transactionServiceProvider, authProvider, et vos modèles)
+
+// ----------------------------------------------------
+// 1. NOTIFIER : Gérer la liste des transactions en mémoire
+// ----------------------------------------------------
+
+class UserRechargesNotifier
+    extends StateNotifier<AsyncValue<List<Transaction>>> {
+  final String etudiantId;
+  final TransactionService _transactionService;
+
+  // Utilisation de StateNotifier pour gérer l'état AsyncValue de la liste
+  UserRechargesNotifier(this.etudiantId, this._transactionService)
+    : super(const AsyncValue.loading()) {
+    fetchRecharges(); // Charger la liste au démarrage
+  }
+
+  // Fonction de chargement initial et de rafraîchissement
+  Future<void> fetchRecharges() async {
+    state = const AsyncValue.loading();
+    try {
+      final response = await _transactionService.getStudentRecharges(
+        etudiantId: etudiantId,
+        limit: 50,
+      );
+      // Mettre à jour l'état avec les données
+      state = AsyncValue.data(response.data);
+    } catch (e, stack) {
+      state = AsyncValue.error('Erreur de chargement: $e', stack);
+    }
+  }
+
+  // Mise à jour locale après AJOUT ou MODIFICATION
+  void addTransaction(Transaction transaction) {
+    if (state.hasValue) {
+      // Mettre le nouvel élément en tête de liste pour l'UX
+      final updatedList = [transaction, ...state.value!];
+      state = AsyncValue.data(updatedList);
+    }
+    // Note: Vous pouvez déclencher un `fetchRecharges()` après un délai
+    // pour s'assurer que l'état local correspond bien au backend.
+  }
+
+  // Mise à jour locale après SUPPRESSION
+  void removeTransaction(String transactionId) {
+    if (state.hasValue) {
+      final updatedList = state.value!
+          .where((t) => t.id != transactionId)
+          .toList();
+      state = AsyncValue.data(updatedList);
+    }
+  }
+}
+
+// ----------------------------------------------------
+// 2. PROVIDER PRINCIPAL : (FutureProvider remplacé par StateNotifierProvider.family)
+// ----------------------------------------------------
+
+// Family pour l'accès aux recharges d'un étudiant spécifique
+final userRechargesNotifierProvider =
+    StateNotifierProvider.family<
+      UserRechargesNotifier,
+      AsyncValue<List<Transaction>>,
+      String
+    >((ref, etudiantId) {
+      final transactionService = ref.watch(transactionServiceProvider);
+      return UserRechargesNotifier(etudiantId, transactionService);
+    });
+
+// ----------------------------------------------------
+// 3. ADAPTATION DES PROVIDERS D'ACTION (Création/Suppression)
+// ----------------------------------------------------
+
+// REMARQUE: Les providers d'action ci-dessous ne sont plus des FutureProvider.family,
+// car leur seul but est de s'exécuter et d'appeler ensuite le Notifier.
+// Le résultat du Future n'est pas utilisé directement par un `ref.watch`.
+
+// Le Provider pour créer une recharge devient une simple fonction asynchrone dans un `Provider`
+final createRechargeActionProvider = Provider((ref) {
+  final transactionService = ref.watch(transactionServiceProvider);
+
+  // Fonction qui sera appelée depuis le widget
+  Future<Transaction> createRecharge({
+    required String etudiantId,
+    required int amount,
+    required String phone,
+    String description = '',
+    String currency = 'CDF',
+    String paymentMethod = 'mobile_money',
+  }) async {
+    try {
+      // 1. Appeler le service API
+      final transaction = await transactionService.createRecharge(
+        etudiantId: etudiantId,
+        amount: amount,
+        phone: phone,
+        description: description,
+        currency: currency,
+        paymentMethod: paymentMethod,
+      );
+
+      // 2. Mettre à jour l'état local IMMÉDIATEMENT via le Notifier
+      // Ajouter la transaction en tête de liste pour l'UX
+      ref
+          .read(userRechargesNotifierProvider(etudiantId).notifier)
+          .addTransaction(transaction);
+
+      return transaction;
+    } catch (e) {
+      print('❌ Erreur création recharge: $e');
+      rethrow;
+    }
+  }
+
+  return createRecharge;
+});
+
+// Le Provider pour supprimer une recharge
+final deleteRechargeActionProvider = Provider((ref) {
+  final transactionService = ref.watch(transactionServiceProvider);
+
+  Future<void> deleteRecharge({
+    required String rechargeId,
+    required String etudiantId,
+  }) async {
+    try {
+      // 1. Appeler le service API
+      await transactionService.deleteRecharge(rechargeId);
+
+      // 2. Mettre à jour l'état local IMMÉDIATEMENT via le Notifier
+      ref
+          .read(userRechargesNotifierProvider(etudiantId).notifier)
+          .removeTransaction(rechargeId);
+
+      print('✅ Recharge supprimée avec succès: $rechargeId');
+    } catch (e) {
+      print('❌ Erreur suppression recharge: $e');
+      rethrow;
+    }
+  }
+
+  return deleteRecharge;
+});
+
+// Le Provider pour effectuer le paiement d'une recharge
+final payRechargeActionProvider = Provider((ref) {
+  final transactionService = ref.watch(transactionServiceProvider);
+
+  Future<Transaction> payRecharge({
+    required String rechargeId,
+    required Map<String, dynamic> transactionData,
+  }) async {
+    try {
+      final transaction = await transactionService.payRecharge(
+        rechargeId: rechargeId,
+        transactionData: transactionData,
+      );
+
+      print('✅ Paiement effectué: $rechargeId');
+      return transaction;
+    } catch (e) {
+      print('❌ Erreur paiement: $e');
+      rethrow;
+    }
+  }
+
+  return payRecharge;
+});
+
+// Le Provider pour vérifier le statut d'une recharge
+final checkRechargeStatusActionProvider = Provider((ref) {
+  final transactionService = ref.watch(transactionServiceProvider);
+
+  Future<RechargeStatus> checkStatus(String orderNumber) async {
+    try {
+      final status = await transactionService.checkRechargeStatus(orderNumber);
+      print('✅ Statut vérifié: ${status.status}');
+      return status;
+    } catch (e) {
+      print('❌ Erreur vérification: $e');
+      rethrow;
+    }
+  }
+
+  return checkStatus;
+});

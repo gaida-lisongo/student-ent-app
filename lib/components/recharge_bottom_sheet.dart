@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/stores/autth_provider.dart';
 import 'package:student_app/stores/transaction_provider.dart';
 import 'package:student_app/screens/payment_status_page.dart';
+import 'package:student_app/components/custom_button.dart';
+import 'package:student_app/services/transaction_service.dart';
 
 class RechargeBottomSheet extends ConsumerStatefulWidget {
   const RechargeBottomSheet({super.key});
@@ -85,49 +87,40 @@ class _RechargeBottomSheetState extends ConsumerState<RechargeBottomSheet> {
     try {
       final amount = int.parse(_amountController.text);
       final phone = _processPhoneNumber(_phoneController.text);
-      final description = _generateDescription();
+      // final description = _generateDescription(); // Si utilisé
       final etudiantId = authState.user!.etudiant.id;
 
-      // Créer la recharge via le service
-      final transactionService = ref.read(transactionServiceProvider);
-      final transaction = await transactionService.createRecharge(
+      // 1. Obtenir la fonction d'action Riverpod (ref.read)
+      final createAction = ref.read(createRechargeActionProvider);
+
+      // 2. Appeler la fonction d'action qui gère l'API et la mise à jour du store
+      final transaction = await createAction(
         etudiantId: etudiantId,
         amount: amount,
         phone: phone,
-        description: description,
+        description:
+            _generateDescription(), // Appel de la description si nécessaire
         currency: 'CDF',
         paymentMethod: 'mobile_money',
       );
 
+      // --- Les lignes de ref.refresh ne sont plus nécessaires ici ! ---
+      // L'action Riverpod s'occupe de la mise à jour locale.
+
       if (!mounted) return;
 
-      // Invalider le cache
-      ref.invalidate(studentRechargesProvider(etudiantId));
-
-      // Naviguer vers la page de statut
-      Navigator.pop(context); // Fermer la bottom sheet
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PaymentStatusPage(
-            orderNumber: transaction.orderNumber,
-            amount: transaction.amount,
-            currency: transaction.currency,
-          ),
-        ),
-      );
+      // Fermer la bottom sheet
+      Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
       );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -278,50 +271,28 @@ class _RechargeBottomSheetState extends ConsumerState<RechargeBottomSheet> {
               const SizedBox(height: 24),
 
               // Boutons
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey[300],
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text(
-                        'Annuler',
-                        style: TextStyle(color: Colors.black),
+              if (_isLoading)
+                const Center(child: CircularProgressIndicator())
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomButton(
+                        title: 'Annuler',
+                        icon: Icons.close,
+                        onTap: () => Navigator.pop(context),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _submitRecharge,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: CustomButton(
+                        title: 'Recharger',
+                        icon: Icons.add_circle,
+                        onTap: _submitRecharge,
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : const Text(
-                              'Recharger',
-                              style: TextStyle(color: Colors.white),
-                            ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
             ],
           ),
         ),

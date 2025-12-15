@@ -156,11 +156,22 @@ class TransactionCard extends StatelessWidget {
 
     switch (transaction.status) {
       case 'pending':
-        return buildButton(
-          title: 'Effectuer le Paiement',
-          color: Colors.orange.shade700,
-          onPressed: onPayment,
-          icon: Icons.payment,
+        return Column(
+          children: [
+            buildButton(
+              title: 'Effectuer le Paiement',
+              color: Colors.orange.shade700,
+              onPressed: onPayment,
+              icon: Icons.payment,
+            ),
+            const SizedBox(height: 8),
+            buildButton(
+              title: 'Vérifier le Paiement',
+              color: Colors.blue.shade700,
+              onPressed: onDetails,
+              icon: Icons.check_circle_outline,
+            ),
+          ],
         );
       case 'ok':
         return buildButton(
@@ -170,6 +181,7 @@ class TransactionCard extends StatelessWidget {
           icon: Icons.account_balance_wallet,
         );
       case 'no':
+      case 'failed':
         return buildButton(
           title: 'Supprimer',
           color: Colors.red.shade700,

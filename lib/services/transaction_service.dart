@@ -199,11 +199,12 @@ class TransactionService {
         },
       );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final Map<String, dynamic> responseData =
             response.data as Map<String, dynamic>;
 
         if (responseData['success'] == true) {
+          print('✅ Recharge créée avec succès: ${responseData['data']['_id']}');
           return Transaction.fromJson(
             responseData['data'] as Map<String, dynamic>,
           );
@@ -216,7 +217,11 @@ class TransactionService {
       } else {
         throw Exception('Erreur serveur: ${response.statusCode}');
       }
+    } on DioException catch (e) {
+      print('❌ Erreur DIO: ${e.message}');
+      throw Exception('Erreur lors de la création: ${e.message}');
     } catch (e) {
+      print('❌ Erreur inattendue: $e');
       throw Exception('Erreur lors de la création: $e');
     }
   }
@@ -288,6 +293,46 @@ class TransactionService {
             response.data as Map<String, dynamic>;
 
         return RechargeStatus.fromJson(responseData);
+      } else {
+        throw Exception('Erreur serveur: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      String errorMessage = 'Erreur réseau';
+
+      if (e.type == DioExceptionType.connectionTimeout) {
+        errorMessage = 'Timeout de connexion';
+      } else if (e.type == DioExceptionType.receiveTimeout) {
+        errorMessage = 'Timeout de réception';
+      } else if (e.type == DioExceptionType.badResponse) {
+        errorMessage =
+            'Erreur serveur ${e.response?.statusCode}: ${e.response?.data}';
+      } else if (e.type == DioExceptionType.connectionError) {
+        errorMessage = 'Impossible de se connecter au serveur';
+      }
+
+      print('❌ Erreur DIO: $errorMessage');
+      throw Exception(errorMessage);
+    } catch (e) {
+      print('❌ Erreur inattendue: $e');
+      throw Exception('Erreur inattendue: $e');
+    }
+  }
+
+  // Supprimer une recharge
+  Future<void> deleteRecharge(String rechargeId) async {
+    try {
+      final response = await _dio.delete('/api/recharges/$rechargeId');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData =
+            response.data as Map<String, dynamic>;
+
+        if (responseData['success'] != true) {
+          throw Exception(
+            responseData['message'] ?? "Erreur lors de la suppression",
+          );
+        }
+        print('✅ Recharge supprimée: $rechargeId');
       } else {
         throw Exception('Erreur serveur: ${response.statusCode}');
       }
