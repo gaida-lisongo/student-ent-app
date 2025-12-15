@@ -1,4 +1,7 @@
+import 'dart:io'; // Nécessaire pour File
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart'; // Importation nécessaire
 
 // Service utilitaire pour l'avatar (inchangé)
 class AvatarService {
@@ -18,43 +21,52 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  // Données de l'utilisateur (Mock data basé sur ton modèle)
+class _ProfileScreenState extends State<ProfileScreen>
+    with TickerProviderStateMixin {
+  // Données de l'utilisateur (Mock data)
   String userName = "Alice Dupont";
   String matricule = "STD-2024-001";
-  String email = "alice.dupont@student.edu";
   String telephone = "+243 81 000 0001";
-  String avatarSeed = "Alice Dupont";
+  String email = "alice.dupont@student.edu";
 
-  // Simulation de la sélection de photo (nécessite 'image_picker')
-  void _pickNewPhoto() {
-    // Si 'image_picker' est installé:
-    // final ImagePicker picker = ImagePicker();
-    // final XFile? photo = await picker.pickImage(source: ImageSource.gallery);
+  // Stockage local de la photo sélectionnée
+  File? _imageFile;
+  String _avatarSeed = "Alice Dupont";
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Déclenchement du sélecteur de photos via image_picker...',
-        ),
-      ),
+  // --- LOGIQUE DE SELECTION DE PHOTO (image_picker) ---
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _pickNewPhoto() async {
+    final XFile? pickedFile = await _picker.pickImage(
+      source: ImageSource.gallery,
     );
-    // Simulation du changement
-    setState(() {
-      avatarSeed = 'NewAvatarSeed${DateTime.now().millisecondsSinceEpoch}';
-    });
+
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Photo de profil mise à jour localement.'),
+        ),
+      );
+    }
   }
 
-  // --- MODALE RÉUTILISABLE (Le Builder Pattern) ---
-  // La fonction prend un Widget formContent à afficher
+  // --- MODALE RÉUTILISABLE (Builder Pattern) ---
   void _showEditModal({
     required String title,
-    required Widget formContent, // Le contenu du formulaire est passé ici
+    required Widget formContent,
     required VoidCallback onSave,
   }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      transitionAnimationController: AnimationController(
+        // Contrôleur pour l'animation personnalisée
+        vsync: this,
+        duration: const Duration(milliseconds: 300),
+      ),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
       ),
@@ -70,6 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Poignée
               Center(
                 child: Container(
                   width: 40,
@@ -81,28 +94,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              // Titre
               Text(
                 'Modifier $title',
                 style: const TextStyle(
-                  fontSize: 20,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Affichage du Widget de formulaire passé en paramètre
+              // Contenu du Formulaire
               formContent,
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
+              // Bouton Sauvegarder
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    onSave(); // Appel de la logique de sauvegarde spécifique
+                    onSave();
                     Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: Colors.black, // Bouton noir
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -110,7 +126,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: const Text(
                     'Sauvegarder',
-                    style: TextStyle(color: Colors.white, fontSize: 16),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
@@ -122,117 +142,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // --- WIDGETS DE FORMULAIRE SPÉCIFIQUES ---
+  // --- WIDGETS DE FORMULAIRE CHICS (Nouvelles couleurs/styles) ---
 
-  // Formulaire pour Informations Personnelles (basé sur ton modèle)
+  // Style élégant pour les champs de texte
+  InputDecoration _chicInputDecoration(String label, {String? hint}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      labelStyle: TextStyle(color: Colors.grey.shade700),
+      floatingLabelStyle: const TextStyle(color: Colors.indigo), // Bleu chic
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.grey.shade300, width: 1.0),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(
+          color: Colors.indigo,
+          width: 2.0,
+        ), // Mieux en focus
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: Colors.grey.shade300, width: 1.0),
+      ),
+    );
+  }
+
   Widget _buildPersonalInfoForm() {
     return Column(
-      children: const [
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Nom',
-            border: OutlineInputBorder(),
-          ),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextFormField(decoration: _chicInputDecoration('Nom')),
+        const SizedBox(height: 15),
+        TextFormField(decoration: _chicInputDecoration('Post Nom')),
+        const SizedBox(height: 15),
+        TextFormField(decoration: _chicInputDecoration('Prénom')),
+        const SizedBox(height: 15),
+        TextFormField(decoration: _chicInputDecoration('Lieu de Naissance')),
+        const SizedBox(height: 15),
+        TextFormField(
+          decoration: _chicInputDecoration('Date de Naissance'),
+          keyboardType: TextInputType.datetime,
         ),
-        SizedBox(height: 10),
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Post Nom',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        SizedBox(height: 10),
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Prénom',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        SizedBox(height: 10),
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Lieu de Naissance',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        SizedBox(height: 10),
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Date de Naissance',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        // Le sexe peut être un Dropdown
       ],
     );
   }
 
-  // Formulaire pour Coordonnées
   Widget _buildAddressForm() {
     return Column(
-      children: const [
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Adresse Complète',
-            border: OutlineInputBorder(),
-          ),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextFormField(
+          decoration: _chicInputDecoration('Adresse Complète'),
           maxLines: 3,
         ),
       ],
     );
   }
 
-  // Formulaire pour Contact
   Widget _buildContactForm() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Téléphone',
-            border: OutlineInputBorder(),
-            hintText: telephone,
-          ),
+        TextFormField(
+          decoration: _chicInputDecoration('Téléphone', hint: telephone),
           keyboardType: TextInputType.phone,
         ),
-        const SizedBox(height: 10),
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Email',
-            border: OutlineInputBorder(),
-            hintText: email,
-          ),
+        const SizedBox(height: 15),
+        TextFormField(
+          decoration: _chicInputDecoration('Email', hint: email),
           keyboardType: TextInputType.emailAddress,
-        ),
-      ],
-    );
-  }
-
-  // Formulaire pour Changer le Mot de Passe
-  Widget _buildPasswordChangeForm() {
-    return Column(
-      children: const [
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Mot de Passe Actuel',
-            border: OutlineInputBorder(),
-          ),
-          obscureText: true,
-        ),
-        SizedBox(height: 10),
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Nouveau Mot de Passe',
-            border: OutlineInputBorder(),
-          ),
-          obscureText: true,
-        ),
-        SizedBox(height: 10),
-        TextField(
-          decoration: InputDecoration(
-            labelText: 'Confirmer Nouveau Mot de Passe',
-            border: OutlineInputBorder(),
-          ),
-          obscureText: true,
         ),
       ],
     );
@@ -241,29 +222,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white, // Fond blanc pur
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.fromLTRB(
+            20.0,
+            20.0,
+            20.0,
+            80.0,
+          ), // Ajouter du padding en bas pour la barre flottante
           children: <Widget>[
-            // ... (Titre, Avatar, Nom/Matricule - inchangé) ...
+            // 1. Titre de la page
             const Text(
               'Mon Profil',
               style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                fontSize: 30,
+                fontWeight: FontWeight.w900, // Extra Bold
+                color: Colors.black,
               ),
             ),
-            const SizedBox(height: 25),
+            const SizedBox(height: 35),
+
+            // 2. Photo de l'avatar et sélection (Stylisation BackdropFilter)
             _buildAvatarSection(context),
-            const SizedBox(height: 10),
+            const SizedBox(height: 20),
+
+            // 3. Nom et Matricule
             Center(
               child: Column(
                 children: [
                   Text(
                     userName,
                     style: const TextStyle(
-                      fontSize: 22,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.black,
                     ),
@@ -275,24 +266,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 40),
 
-            // 4. Section des Informations Modifiables (Utilisation du Builder Pattern)
+            // 4. Section des Informations Modifiables
             _buildProfileCard(
               icon: Icons.person_outline,
               title: "Informations Personnelles",
               subtitle: "Nom, post-nom, prénom, sexe, date de naissance...",
               onTap: () => _showEditModal(
                 title: "les informations personnelles",
-                formContent:
-                    _buildPersonalInfoForm(), // Passe le widget du formulaire
+                formContent: _buildPersonalInfoForm(),
                 onSave: () {
-                  // Logique de sauvegarde des informations personnelles ici
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Informations personnelles sauvegardées !'),
-                    ),
-                  );
+                  /* Logique de sauvegarde */
                 },
               ),
             ),
@@ -304,10 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: "les coordonnées",
                 formContent: _buildAddressForm(),
                 onSave: () {
-                  // Logique de sauvegarde des coordonnées ici
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Coordonnées sauvegardées !')),
-                  );
+                  /* Logique de sauvegarde */
                 },
               ),
             ),
@@ -319,31 +301,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: "le contact",
                 formContent: _buildContactForm(),
                 onSave: () {
-                  // Logique de sauvegarde du contact ici
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Contact sauvegardé !')),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 40),
-
-            // CHANGEMENT DE MOT DE PASSE (Mot clé ajusté)
-            _buildProfileCard(
-              icon: Icons.lock_outline,
-              title: "Changer le Mot de Passe", // Libellé ajusté
-              subtitle: "Sécurité du compte",
-              onTap: () => _showEditModal(
-                title: "le mot de passe",
-                formContent: _buildPasswordChangeForm(),
-                onSave: () {
-                  // Logique de changement de mot de passe ici
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Mot de passe changé avec succès !'),
-                    ),
-                  );
+                  /* Logique de sauvegarde */
                 },
               ),
             ),
@@ -354,20 +312,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // ----------------------------------------------------
-  // WIDGETS DE COMPOSANTS RÉUTILISABLES (Inchangés/Simplifiés)
+  // WIDGETS DE COMPOSANTS RÉUTILISABLES STYLISÉS
   // ----------------------------------------------------
 
+  // 1. Section Avatar avec Photo Locale/Réseau et Bouton de Modification
   Widget _buildAvatarSection(BuildContext context) {
-    // ... (Logique inchangée)
+    // Déterminer la source de l'image
+    ImageProvider imageProvider;
+    if (_imageFile != null) {
+      imageProvider = FileImage(_imageFile!);
+    } else {
+      imageProvider = NetworkImage(AvatarService.getAvatarUrl(_avatarSeed));
+    }
+
     return Center(
       child: Stack(
         children: [
           CircleAvatar(
-            radius: 50,
-            backgroundImage: NetworkImage(
-              AvatarService.getAvatarUrl(avatarSeed),
-            ),
-            backgroundColor: Colors.grey.shade200,
+            radius: 60, // Augmenter la taille
+            backgroundImage: imageProvider,
+            backgroundColor: Colors.grey.shade100,
           ),
           Positioned(
             bottom: 0,
@@ -375,16 +339,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: GestureDetector(
               onTap: _pickNewPhoto,
               child: Container(
-                padding: const EdgeInsets.all(5),
+                padding: const EdgeInsets.all(8), // Plus grand
                 decoration: BoxDecoration(
-                  color: Colors.deepPurple,
+                  color: Colors.indigo, // Bleu foncé chic
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
+                  border: Border.all(color: Colors.white, width: 3),
                 ),
                 child: const Icon(
                   Icons.camera_alt,
                   color: Colors.white,
-                  size: 18,
+                  size: 20,
                 ),
               ),
             ),
@@ -394,32 +358,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // 2. Carte d'Information (Design minimaliste chic)
   Widget _buildProfileCard({
     required IconData icon,
     required String title,
     required String subtitle,
-    required VoidCallback onTap, // Simplifié : pas besoin de 'section' ici
+    required VoidCallback onTap,
   }) {
-    // ... (Logique inchangée)
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      elevation: 0, // Enlever l'ombre pour un look plus plat/moderne
+      color: Colors.grey.shade50, // Fond très clair
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+        side: BorderSide(color: Colors.grey.shade200, width: 1), // Bordure fine
+      ),
       child: ListTile(
         onTap: onTap,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Icon(icon, color: Colors.deepPurple, size: 30),
+        // Icône de la section (Couleur bleue chic)
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.indigo.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: Colors.indigo, size: 24),
+        ),
+        // Titre et Sous-titre
         title: Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: const TextStyle(
+            fontWeight: FontWeight.w600, // Semi-bold
+            fontSize: 16,
+            color: Colors.black87,
+          ),
         ),
         subtitle: Text(
           subtitle,
-          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
         ),
+        // Icône de navigation (flèche)
         trailing: const Icon(
           Icons.arrow_forward_ios,
-          size: 16,
+          size: 14,
           color: Colors.grey,
         ),
       ),
