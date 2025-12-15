@@ -1,24 +1,75 @@
 import 'package:flutter/material.dart';
+// Assurez-vous que ces imports sont corrects dans votre projet
 import 'package:student_app/components/custom_button.dart';
-// Importer le CustomElevatedButton si vous l'avez mis dans un fichier séparé
-// import 'package:votre_projet/widgets/custom_elevated_button.dart';
-
-// (Si vous n'avez pas créé de fichier séparé, utilisez la classe CustomElevatedButton ci-dessus dans ce fichier.)
+import 'package:student_app/screens/scanner_screen.dart'; // Importez votre ScannerScreen
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
-  // Fonction factice (mock) pour la navigation vers l'écran de scan
-  void _navigateToScanScreen(BuildContext context) {
-    // Remplacer plus tard par la navigation réelle vers le QR code scanner
+  // ----------------------------------------------------
+  // LOGIQUE DE TRAITEMENT DU SCAN D'AUTHENTIFICATION
+  // ----------------------------------------------------
+
+  // Cette fonction est la callback passée au ScannerScreen.
+  // Elle est appelée soit immédiatement (si showActionButton est false),
+  // soit lorsque le bouton "Se connecter" est cliqué.
+  void handleAuthScanResult(BuildContext context, String rawData) {
+    // 1. ARRÊTER LA NAVIGATION DU SCANNER
+    // Nous avons les données, nous pouvons fermer l'écran du scanner.
+    // NOTE: Si le ScannerScreen ne gère pas sa propre navigation de retour,
+    // vous pourriez avoir besoin de le faire ici: Navigator.pop(context);
+
+    // 2. LOGIQUE D'AUTHENTIFICATION AVEC LES DONNÉES BRUTES
+
+    // Pour l'instant, on affiche une SnackBar de confirmation
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Navigation vers l\'écran de Scan du QR Code...'),
-        duration: Duration(seconds: 1),
+      SnackBar(
+        content: Text('Donnée scannée reçue: $rawData'),
+        duration: const Duration(seconds: 3),
+        backgroundColor: Colors.green,
       ),
     );
-    // Exemple de navigation (à ajuster)
-    // Navigator.push(context, MaterialPageRoute(builder: (context) => ScanScreen()));
+
+    // TODO:
+    // - Décoder `rawData` (JSON/Base64) pour extraire les identifiants ou l'endpoint.
+    // - Appeler votre `AuthService` (via Riverpod, ou une simple classe) pour la requête API.
+    // - Gérer la persistance de session (flutter_secure_storage) en cas de succès.
+    // - Naviguer vers le Dashboard ou afficher une erreur.
+  }
+
+  // Fonction de navigation vers l'écran de scan
+  void _navigateToScanScreen(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ScannerScreen(
+          title: 'Scanner votre QR Code de Connexion',
+
+          // --- Configuration pour le Workflow d'Authentification ---
+
+          // 1. Afficher le bouton d'action après le scan
+          showActionButton: true,
+          actionButtonText: 'CONNEXION',
+
+          // 2. Passer la callback de traitement des données
+          // La donnée scannée (rawData) sera passée à cette fonction
+          onScanDataReceived: (rawData) {
+            // Ici, nous appelons la fonction de traitement avec le contexte
+            handleAuthScanResult(context, rawData);
+          },
+
+          // 3. (Optionnel) : Callback pour le clic sur le bouton "CONNEXION"
+          // Dans notre cas, la logique principale est dans onScanDataReceived,
+          // mais vous pouvez utiliser ce champ pour une action distincte.
+          onActionButtonPressed: () {
+            // Optionnel: peut servir si vous vouliez délayer
+            // le traitement des données scannées jusqu'au clic du bouton.
+            // Actuellement, on utilise `onScanDataReceived` qui est appelé
+            // lorsque le bouton est cliqué DANS le ScannerScreen.
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -26,12 +77,11 @@ class WelcomeScreen extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          // 1. Image de fond
+          // 1. Image de fond (Corrigé le chemin d'accès)
           Positioned.fill(
             child: Image.asset(
-              'images/wallpaper.jpg',
+              'assets/images/wallpaper.jpg', // Chemin d'accès standard 'assets/images/...'
               fit: BoxFit.cover,
-              // Utiliser un `errorBuilder` pour éviter les erreurs visibles si l'asset est manquant
               errorBuilder: (context, error, stackTrace) {
                 return Container(color: Colors.black); // Fond noir de secours
               },
@@ -44,15 +94,13 @@ class WelcomeScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Colors.black.withOpacity(
-                      0.9,
-                    ), // Très opaque en bas pour le texte
+                    Colors.black.withOpacity(0.9),
                     Colors.black.withOpacity(0.6),
-                    Colors.transparent, // Transparent en haut
+                    Colors.transparent,
                   ],
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
-                  stops: const [0.0, 0.4, 0.8], // Contrôle de la transition
+                  stops: const [0.0, 0.4, 0.8],
                 ),
               ),
             ),
@@ -62,11 +110,10 @@ class WelcomeScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(30.0),
             child: Column(
-              mainAxisAlignment:
-                  MainAxisAlignment.end, // Aligner le contenu en bas
+              mainAxisAlignment: MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Texte de Bienvenue
+                // ... (Textes de Bienvenue et Description) ...
                 const Text(
                   'Bienvenue !',
                   style: TextStyle(
@@ -78,7 +125,6 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
 
-                // Description de la Plateforme (ENT)
                 const Text(
                   'Votre Espace Numérique de Travail (ENT) personnel. Suivez votre activité académique, consultez vos résultats et gérez votre cycle d\'études en toute simplicité.',
                   style: TextStyle(
@@ -93,10 +139,10 @@ class WelcomeScreen extends StatelessWidget {
                 Center(
                   child: CustomButton(
                     title: 'S\'AUTHENTIFIER',
-                    icon:
-                        Icons.qr_code_scanner, // Icône suggérée pour le scan QR
-                    onTap: () => _navigateToScanScreen(context),
-                    // Nous forçons le isDarkMode à true pour un look contrasté sur le fond sombre
+                    icon: Icons.qr_code_scanner,
+                    onTap: () => _navigateToScanScreen(
+                      context,
+                    ), // Appel de la fonction de navigation
                     isDarkMode: true,
                   ),
                 ),
@@ -122,8 +168,3 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 }
-
-// ----------------------------------------------------
-// NOTE: N'oubliez pas d'inclure la définition de 
-// CustomElevatedButton (voir section 1)
-// ----------------------------------------------------
