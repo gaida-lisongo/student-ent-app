@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:student_app/components/button_row.dart'; // MAINTENU
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:student_app/components/button_row.dart';
+import 'package:student_app/components/transaction_card.dart';
+import 'package:student_app/model/student_model.dart';
+import 'package:student_app/model/transaction_model.dart'; // MAINTENU
+import 'package:student_app/stores/autth_provider.dart'; // Importer le provider d'auth
 
 // 1. Service d'Avatar Simulé (inchangé)
 class AvatarService {
@@ -8,35 +13,14 @@ class AvatarService {
   }
 }
 
-// 2. Modèle Transaction (inchangé)
-class Transaction {
-  final String id;
-  final String orderNumber;
-  final String dateCreated;
-  final double amount;
-  final String currency;
-  final String status; // 'completed' | 'pending' | 'ok' | 'no'
-  final String phone;
-
-  Transaction({
-    required this.id,
-    required this.orderNumber,
-    required this.dateCreated,
-    required this.amount,
-    required this.currency,
-    required this.status,
-    required this.phone,
-  });
-}
-
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // Données utilisateur à afficher
   final String userId = '123456';
   final String userName = 'John Doe';
@@ -131,6 +115,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               userHeader(),
               const SizedBox(height: 10),
               metricCard(),
+              const SizedBox(height: 10),
+              inscriptionStatusCard(),
               const SizedBox(height: 10),
               balanceCard(), // WIDGET MAINTENU ET NON CASSÉ
               const SizedBox(height: 10),
@@ -327,59 +313,82 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // --- WIDGETS PRÉCÉDENTS MAINTENUS INTACTS ---
 
   Widget userHeader() {
+    // Utiliser le Consumer pour accéder à l'état d'authentification
     return SizedBox(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundImage: NetworkImage(
-                      AvatarService.getAvatarUrl('John Doe'),
-                    ),
-                  ),
-                  const SizedBox(width: 16.0),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'John Doe',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+        child: Consumer(
+          builder: (context, ref, child) {
+            final authState = ref.watch(authProvider);
+
+            // Si pas d'utilisateur authentifié
+            if (authState.user == null) {
+              return const Center(child: Text('Non authentifié'));
+            }
+
+            final user = authState.user!;
+            final etudiant = user.etudiant;
+            final promotion = user.promotion;
+            final annee = user.annee;
+
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundImage: NetworkImage(
+                          AvatarService.getAvatarUrl(
+                            '${etudiant.nom} ${etudiant.prenom}',
+                          ),
                         ),
                       ),
-                      Text(
-                        'Membre depuis 2020',
-                        style: TextStyle(color: Colors.black87, fontSize: 12),
+                      const SizedBox(width: 16.0),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${etudiant.nom} ${etudiant.prenom}',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Matricule: ${etudiant.matricule}',
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            IconButton(
-              onPressed: () {
-                print('Logout pressed');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Déconnexion simulée')),
-                );
-              },
-              icon: const Icon(
-                Icons.logout_rounded,
-                color: Colors.black,
-                size: 20,
-              ),
-              tooltip: 'Déconnexion',
-            ),
-          ],
+                ),
+                IconButton(
+                  onPressed: () {
+                    // Déconnexion
+                    ref.read(authProvider.notifier).signOut();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Déconnecté avec succès')),
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.logout_rounded,
+                    color: Colors.black,
+                    size: 20,
+                  ),
+                  tooltip: 'Déconnexion',
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -388,355 +397,306 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget metricCard() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Container(
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(12.0)),
-        child: Stack(
-          children: [
-            // 1. Image de fond
-            Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12.0),
-                child: Image.asset(
-                  "assets/images/metric_background.jpg",
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: const Color.fromARGB(255, 4, 84, 221),
-                    );
-                  },
-                ),
-              ),
+      child: Consumer(
+        builder: (context, ref, child) {
+          final authState = ref.watch(authProvider);
+
+          // Données par défaut si non authentifié
+          String anneeDesignation = "2024 - 2025";
+          String promotionDesignation = "Promotion";
+          String niveau = "N/A";
+          String cycle = "N/A";
+          int totalSemestres = 0;
+          int totalCredits = 0;
+
+          if (authState.user != null) {
+            final user = authState.user!;
+            anneeDesignation = "${user.annee.debut} - ${user.annee.fin}";
+            promotionDesignation = user.promotion.designation;
+            niveau = user.promotion.niveau;
+            cycle = user.promotion.cycle;
+            totalSemestres = user.promotion.semestres.length;
+            totalCredits = user.promotion.semestres.fold(
+              0,
+              (value, Semestre element) => value + element.credits,
+            );
+          }
+
+          return Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12.0),
             ),
-            // 2. Calque d'opacité
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12.0),
-                  color: const Color.fromARGB(255, 1, 7, 10).withOpacity(0.6),
-                ),
-              ),
-            ),
-            // 3. Contenu de la carte
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Icon(Icons.home, size: 18, color: Colors.white),
-                      const Text(
-                        "2024 - 2025",
-                        style: TextStyle(fontSize: 15, color: Colors.white70),
-                      ),
-                    ],
+            child: Stack(
+              children: [
+                // 1. Image de fond
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12.0),
+                    child: Image.asset(
+                      "assets/images/metric_background.jpg",
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: const Color.fromARGB(255, 4, 84, 221),
+                        );
+                      },
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  Column(
+                ),
+                // 2. Calque d'opacité
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12.0),
+                      color: const Color.fromARGB(
+                        255,
+                        1,
+                        7,
+                        10,
+                      ).withOpacity(0.6),
+                    ),
+                  ),
+                ),
+                // 3. Contenu de la carte
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.start,
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        "Promotion",
-                        style: TextStyle(fontSize: 12, color: Colors.white70),
-                      ),
-                      Text(
-                        'L1 HE',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        "Mention: BTP",
-                        style: TextStyle(fontSize: 12, color: Colors.white70),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Icon(Icons.home, size: 18, color: Colors.white),
                           Text(
-                            "Semestre",
-                            style: TextStyle(
-                              fontSize: 12,
+                            anneeDesignation,
+                            style: const TextStyle(
+                              fontSize: 15,
                               color: Colors.white70,
                             ),
-                          ),
-                          Text(
-                            "2",
-                            style: TextStyle(fontSize: 14, color: Colors.white),
                           ),
                         ],
                       ),
-                      const SizedBox(width: 40),
+                      const SizedBox(height: 10),
                       Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            "Crédits",
+                        children: [
+                          const Text(
+                            "Promotion",
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.white70,
                             ),
                           ),
                           Text(
-                            "60",
-                            style: TextStyle(fontSize: 14, color: Colors.white),
+                            promotionDesignation,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            "Niveau: $niveau | Cycle: $cycle",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Semestre",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              Text(
+                                totalSemestres.toString(),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 40),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Crédits",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              Text(
+                                totalCredits.toString(),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
+      ),
+    );
+  }
+
+  // inscriptionStatusCard : Affiche le statut d'inscription
+  Widget inscriptionStatusCard() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Consumer(
+        builder: (context, ref, child) {
+          final authState = ref.watch(authProvider);
+
+          String statut = "Non disponible";
+
+          if (authState.user != null) {
+            statut = authState.user!.statut;
+          }
+
+          // Couleur basée sur le statut
+          Color statusColor = Colors.grey;
+          if (statut.toLowerCase() == 'actif' ||
+              statut.toLowerCase() == 'inscrit') {
+            statusColor = Colors.green;
+          } else if (statut.toLowerCase() == 'en attente') {
+            statusColor = Colors.orange;
+          }
+
+          return Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              border: Border.all(color: statusColor.withOpacity(0.3), width: 1),
+              borderRadius: BorderRadius.circular(12.0),
+              color: statusColor.withOpacity(0.05),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Statut d\'Inscription',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8.0),
+                    Text(
+                      statut,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: statusColor,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.all(12.0),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: statusColor.withOpacity(0.1),
+                  ),
+                  child: Icon(
+                    Icons.check_circle_outline,
+                    color: statusColor,
+                    size: 24,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
   // balanceCard : REVENU À SA VERSION ORIGINALE (AVEC BUTTON_ROW)
   Widget balanceCard() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Balance solde",
-            style: TextStyle(fontSize: 14, color: Colors.black87),
-          ),
-          const SizedBox(height: 8.0),
-          const Text(
-            "11000 FC",
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 16.0),
-          // Utilisation du ButtonRow comme dans ton code initial
-          // NOTE: Le widget ButtonRow doit exister dans ton projet pour que ceci fonctionne
-          // Si ButtonRow n'est pas un widget standard ou n'est pas fourni, le code peut échouer ici.
-          ButtonRow(
-            leftButtonTitle: "Recharger",
-            leftButtonIcon: Icons.add,
-            leftButtonOnTap: () {
-              print('Recharger tapped');
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Recharge en cours...')),
-              );
-            },
-            rightButtonTitle: "Historique",
-            rightButtonIcon: Icons.history,
-            rightButtonOnTap: () {
-              print('Historique tapped');
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Historique des transactions')),
-              );
-            },
-            isDarkMode: true,
-          ),
-        ],
-      ),
-    );
-  }
-}
+    return Consumer(
+      builder: (context, ref, child) {
+        final authState = ref.watch(authProvider);
 
-// Widget pour afficher une carte de transaction (MAIN COMPONENT)
-class TransactionCard extends StatelessWidget {
-  final Transaction transaction;
-  final VoidCallback onPayment;
-  final VoidCallback onCredit;
-  final VoidCallback onDelete;
-  final VoidCallback onDetails;
+        // Données par défaut si non authentifié
+        int soldeValue = 0;
 
-  const TransactionCard({
-    super.key,
-    required this.transaction,
-    required this.onPayment,
-    required this.onCredit,
-    required this.onDelete,
-    required this.onDetails,
-  });
+        if (authState.user != null) {
+          soldeValue = authState.user!.etudiant.solde;
+        }
 
-  Color _getStatusColor() {
-    switch (transaction.status) {
-      case 'completed':
-        return Colors.green;
-      case 'pending':
-        return Colors.orange;
-      case 'ok':
-        return Colors.blue;
-      case 'no':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _getStatusLabel() {
-    switch (transaction.status) {
-      case 'completed':
-        return 'Complétée';
-      case 'pending':
-        return 'En attente';
-      case 'ok':
-        return 'Approuvée';
-      case 'no':
-        return 'Échouée';
-      default:
-        return 'Inconnu';
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.0)),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // En-tête avec numéro et statut
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  transaction.orderNumber,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Balance solde",
+                style: TextStyle(fontSize: 14, color: Colors.black87),
+              ),
+              const SizedBox(height: 8.0),
+              Text(
+                "$soldeValue FC",
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor().withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _getStatusLabel(),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: _getStatusColor(),
+              ),
+              const SizedBox(height: 16.0),
+              // Utilisation du ButtonRow comme dans ton code initial
+              // NOTE: Le widget ButtonRow doit exister dans ton projet pour que ceci fonctionne
+              // Si ButtonRow n'est pas un widget standard ou n'est pas fourni, le code peut échouer ici.
+              ButtonRow(
+                leftButtonTitle: "Recharger",
+                leftButtonIcon: Icons.add,
+                leftButtonOnTap: () {
+                  print('Recharger tapped');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Recharge en cours...')),
+                  );
+                },
+                rightButtonTitle: "Historique",
+                rightButtonIcon: Icons.history,
+                rightButtonOnTap: () {
+                  print('Historique tapped');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Historique des transactions'),
                     ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            // Montant et date
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${transaction.amount} ${transaction.currency}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                Text(
-                  transaction.dateCreated,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // Téléphone
-            Text(
-              'Téléphone: ${transaction.phone}',
-              style: const TextStyle(fontSize: 12, color: Colors.black87),
-            ),
-            const SizedBox(height: 12),
-            // Boutons d'action (Logique conditionnelle)
-            _buildActionButtons(context),
-          ],
-        ),
-      ),
+                  );
+                },
+                isDarkMode: true,
+              ),
+            ],
+          ),
+        );
+      },
     );
-  }
-
-  Widget _buildActionButtons(BuildContext context) {
-    // Bouton par défaut avec style cohérent
-    Widget buildButton({
-      required String title,
-      required Color color,
-      required VoidCallback onPressed,
-      IconData? icon,
-    }) {
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: onPressed,
-          icon: icon != null
-              ? Icon(icon, color: Colors.white, size: 18)
-              : const SizedBox.shrink(),
-          label: Text(
-            title,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-          ),
-        ),
-      );
-    }
-
-    switch (transaction.status) {
-      case 'pending':
-        return buildButton(
-          title: 'Effectuer le Paiement',
-          color: Colors.orange.shade700,
-          onPressed: onPayment,
-          icon: Icons.payment,
-        );
-      case 'ok':
-        return buildButton(
-          title: 'Créditer le Solde',
-          color: Colors.blue.shade700,
-          onPressed: onCredit,
-          icon: Icons.account_balance_wallet,
-        );
-      case 'no':
-        return buildButton(
-          title: 'Supprimer',
-          color: Colors.red.shade700,
-          onPressed: onDelete,
-          icon: Icons.delete_forever,
-        );
-      case 'completed':
-        return buildButton(
-          title: 'Voir les Détails',
-          color: Colors.green.shade700,
-          onPressed: onDetails,
-          icon: Icons.info_outline,
-        );
-      default:
-        return const SizedBox.shrink();
-    }
   }
 }
