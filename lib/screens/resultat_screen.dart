@@ -47,7 +47,8 @@ class _ResultatScreenState extends State<ResultatScreen> {
     BulletinProduct(
       id: '1',
       designation: 'Résultat Annuel',
-      description: 'Bulletin pour l\'année académique complète.',
+      description:
+          'Bulletin pour l\'année académique complète, indispensable pour la transition.',
       montant: 5000,
       credit: 60,
       anneeAcad: '2024-2025',
@@ -55,7 +56,8 @@ class _ResultatScreenState extends State<ResultatScreen> {
     BulletinProduct(
       id: '2',
       designation: 'Résultat Semestre 1',
-      description: 'Bulletin détaillé du premier semestre.',
+      description:
+          'Consultation détaillée de toutes les notes et crédits du premier semestre.',
       montant: 2500,
       credit: 30,
       anneeAcad: '2024-2025',
@@ -63,7 +65,8 @@ class _ResultatScreenState extends State<ResultatScreen> {
     BulletinProduct(
       id: '3',
       designation: 'Résultat Semestre 2',
-      description: 'Bulletin détaillé du second semestre.',
+      description:
+          'Consultation détaillée de toutes les notes et crédits du second semestre.',
       montant: 2500,
       credit: 30,
       anneeAcad: '2024-2025',
@@ -94,7 +97,6 @@ class _ResultatScreenState extends State<ResultatScreen> {
 
   // --- ACTIONS DE L'UTILISATEUR ---
 
-  // Action pour commander un bulletin
   void _orderBulletin(BulletinProduct product) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -103,10 +105,8 @@ class _ResultatScreenState extends State<ResultatScreen> {
         ),
       ),
     );
-    // Logique réelle d'appel API de commande ici
   }
 
-  // Action pour visualiser/générer le PDF
   void _viewBulletinPDF(OrderedBulletin order) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -115,145 +115,265 @@ class _ResultatScreenState extends State<ResultatScreen> {
         ),
       ),
     );
-    // Logique réelle de récupération/génération du PDF ici
   }
 
   // --- WIDGETS DE COMPOSANTS ---
 
+  String _getCardImagePath(int index) {
+    final int imageNumber = (index % 3) + 1;
+    // J'ai corrigé le chemin ici, en supposant que "images" est le sous-dossier de "assets"
+    return 'images/check-$imageNumber.jpg';
+  }
+
   // 1. Carte de Commande de Bulletin (Section Horizontale)
-  Widget _buildOrderCard(BulletinProduct product) {
+  Widget _buildOrderCard(BulletinProduct product, int index) {
+    final String imagePath = _getCardImagePath(index);
+
     return Container(
-      width:
-          MediaQuery.of(context).size.width * 0.85, // Prend 85% de la largeur
+      width: MediaQuery.of(context).size.width * 0.85,
       margin: const EdgeInsets.only(right: 15),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          // Dégradé pour effet "carte bancaire"
-          colors: [Color.fromARGB(255, 33, 33, 33), Color(0xFF1E2749)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // En-tête (Désignation)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                product.designation,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                product.anneeAcad,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 12,
-                ),
+        child: Container(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
 
-          // Infos Crédit/Montant
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Stack(
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Crédits',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
-                      fontSize: 11,
-                    ),
-                  ),
-                  Text(
-                    '${product.credit}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+              // Composant 1: Image de fond (avec gestion d'erreur)
+              Positioned.fill(
+                child: Image.asset(
+                  imagePath,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors
+                          .black, // Couleur de secours si image non trouvée
+                    );
+                  },
+                ),
               ),
-              // Bouton Commander
-              ElevatedButton(
-                onPressed: () => _orderBulletin(product),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo.shade400, // Bleu pour l'action
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
+
+              // Composant 2: Calque de gradient (PLUS FONCÉ ET PLUS SÉCURISANT)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.black.withOpacity(0.8), // Plus opaque en bas
+                        Colors.black.withOpacity(0.4), // Moins opaque en haut
+                      ],
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                    ),
                   ),
                 ),
-                child: Text(
-                  'Commander (${product.montant} FC)',
-                  style: const TextStyle(color: Colors.white, fontSize: 13),
+              ),
+
+              // Composant 3: Contenu réel de la carte (Texte et Boutons)
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // En-tête (Désignation, Description, Année)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.designation,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        // AJOUT DE LA DESCRIPTION
+                        Text(
+                          product.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          product.anneeAcad,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.6),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Infos Crédit/Montant/Bouton
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Crédits Totaux',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: 11,
+                              ),
+                            ),
+                            Text(
+                              '${product.credit}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        // Bouton Commander
+                        ElevatedButton(
+                          onPressed: () => _orderBulletin(product),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.indigo.shade400,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 15,
+                              vertical: 8, // L'ai rendu un peu plus petit
+                            ),
+                          ),
+                          child: Text(
+                            'Commander (${product.montant} FC)',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  // 2. Carte d'Historique de Bulletin (Section Verticale)
+  // 2. Carte d'Historique de Bulletin (Section Verticale - REFAITE AVEC ANIMATION)
   Widget _buildHistoryCard(OrderedBulletin order) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12, left: 5, right: 5),
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.green.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.file_copy_outlined, color: Colors.green),
-        ),
-        title: Text(
-          order.designation,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Text(
-          'Commandé le ${order.dateOrdered} | Statut: ${order.status}',
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-        ),
-        trailing: ElevatedButton(
-          onPressed: () => _viewBulletinPDF(order),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.indigo,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+      child: Material(
+        // Utiliser Material pour l'InkWell et l'élévation
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        elevation: 5, // Plus d'élévation pour un look plus "chic"
+        child: InkWell(
+          // Ajout d'InkWell pour les animations de tap
+          onTap: () => _viewBulletinPDF(order),
+          borderRadius: BorderRadius.circular(15),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Icone et Texte
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.withOpacity(0.1), // Bleu subtil
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons
+                            .insert_drive_file_outlined, // Icône plus spécifique
+                        color: Colors.indigo,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.designation,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Commandé: ${order.dateOrdered}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        Text(
+                          'ID Commande: ${order.orderId}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                // Bouton Voir
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade600,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.picture_as_pdf,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Voir',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ),
-          child: const Text(
-            'Voir',
-            style: TextStyle(color: Colors.white, fontSize: 13),
           ),
         ),
       ),
@@ -265,7 +385,6 @@ class _ResultatScreenState extends State<ResultatScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        // Utilisation d'un Column pour empiler la barre horizontale et la section arrondie
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -295,13 +414,13 @@ class _ResultatScreenState extends State<ResultatScreen> {
               ),
             ),
             SizedBox(
-              height: 180, // Hauteur fixe pour le défilement horizontal
+              height: 190, // Augmenté pour accueillir la description
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 itemCount: _products.length,
                 itemBuilder: (context, index) {
-                  return _buildOrderCard(_products[index]);
+                  return _buildOrderCard(_products[index], index);
                 },
               ),
             ),
@@ -311,8 +430,7 @@ class _ResultatScreenState extends State<ResultatScreen> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color:
-                      Colors.grey.shade50, // Fond légèrement grisé pour séparer
+                  color: Colors.grey.shade50,
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(30),
                     topRight: Radius.circular(30),
@@ -332,7 +450,7 @@ class _ResultatScreenState extends State<ResultatScreen> {
                     const Padding(
                       padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
                       child: Text(
-                        'Historique des commandes',
+                        'Historique des commandes (PDF)',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
