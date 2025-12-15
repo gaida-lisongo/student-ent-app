@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:student_app/components/custom_button.dart';
 import 'package:student_app/components/button_row.dart'; // MAINTENU
 
 // 1. Service d'Avatar Simulé (inchangé)

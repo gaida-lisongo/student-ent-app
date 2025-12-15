@@ -1,12 +1,44 @@
 import 'package:flutter/material.dart';
-// Assurez-vous que ces chemins d'importation sont corrects pour vos fichiers
-import 'package:student_app/screens/dashboard_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/screens/profile_screen.dart';
 import 'package:student_app/screens/resultat_screen.dart';
-import 'package:student_app/screens/welcome_screen.dart';
+import 'package:student_app/screens/welcome_screen.dart'; // Écran de Bienvenue
+import 'package:student_app/stores/autth_provider.dart';
+import 'package:student_app/screens/dashboard_screen.dart'; // Créer cette page
+
+// L'écran par défaut à afficher si l'utilisateur est connecté/déconnecté
+class AuthChecker extends ConsumerWidget {
+  const AuthChecker({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+
+    // 1. Afficher un indicateur pendant le chargement initial de la session
+    if (authState.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // 2. Afficher l'écran approprié
+    if (authState.user != null) {
+      // Si l'utilisateur est connecté, aller au tableau de bord
+      return const MyHomePage(title: "Student ENT");
+    } else {
+      // Sinon, afficher l'écran de bienvenue
+      return const WelcomeScreen();
+    }
+  }
+}
 
 void main() {
-  runApp(const MyApp());
+  // Assurez-vous d'appeler WidgetsFlutterBinding.ensureInitialized()
+  // si vous devez initialiser des plugins avant runApp (par exemple flutter_secure_storage)
+  WidgetsFlutterBinding.ensureInitialized();
+
+  runApp(
+    // 1. Envelopper l'application avec ProviderScope
+    const ProviderScope(child: MyApp()),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -18,13 +50,11 @@ class MyApp extends StatelessWidget {
       title: 'Student App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      routes: {
-        '/dashboard': (context) => MyHomePage(title: 'Student App Home'),
-      },
-      home: const WelcomeScreen(),
+      // Utiliser AuthChecker pour décider de l'écran initial
+      home: const AuthChecker(),
     );
   }
 }
@@ -156,7 +186,11 @@ class _MyHomePageState extends State<MyHomePage> {
             },
             // Assurez-vous que ProfileScreen, DashboardScreen, RechargeScreen
             // sont bien importés et définis (comme vous l'avez fait)
-            children: [ProfileScreen(), DashboardScreen(), ResultatScreen()],
+            children: const [
+              ProfileScreen(),
+              DashboardScreen(),
+              ResultatScreen(),
+            ],
           ),
 
           // 2. La Bottom Navigation Bar Flottante
@@ -168,3 +202,6 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 }
+
+// N'oubliez pas de créer un fichier lib/screens/dashboard_screen.dart (même vide)
+// pour que le code ci-dessus compile.
