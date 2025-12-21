@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:student_app/components/button_row.dart';
-import 'package:student_app/components/transaction_card.dart';
-import 'package:student_app/components/recharge_bottom_sheet.dart';
+import 'package:student_app/model/annee_model.dart';
+import 'package:student_app/model/promotion_model.dart';
 import 'package:student_app/model/student_model.dart';
-import 'package:student_app/model/transaction_model.dart'; // MAINTENU
-import 'package:student_app/stores/auth_provider.dart'; // Importer le provider d'auth
-import 'package:student_app/stores/recharge_provider.dart'; // Importer le provider de transaction
+import 'package:student_app/stores/annee_provider.dart';
+import 'package:student_app/stores/auth_provider.dart';
+import 'package:student_app/stores/promotion_provider.dart';
+import 'package:student_app/stores/student_provider.dart';
+// import 'package:student_app/components/button_row.dart';
+// import 'package:student_app/components/transaction_card.dart';
+// import 'package:student_app/components/recharge_bottom_sheet.dart';
+// import 'package:student_app/model/student_model.dart';
+// import 'package:student_app/model/transaction_model.dart';
+// import 'package:student_app/stores/auth_provider.dart';
+// import 'package:student_app/stores/student_provider.dart';
 
 // 1. Service d'Avatar Simulé (inchangé)
 class AvatarService {
@@ -34,119 +41,155 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final studentState = ref.watch(etudiantProvider);
     // CORRECTION MAJEURE : Remplacer le Column principal par un ListView
     // pour permettre à tout le contenu, y compris la liste des transactions, de défiler.
-    return Stack(
-      children: [
-        // Widget 0 : Le fond en dégradé oblique (inchangé)
-        Container(
-          decoration: BoxDecoration(
-            // gradient: LinearGradient(
-            //   begin: Alignment.bottomLeft,
-            //   end: Alignment.topRight,
-            //   colors: [
-            //     const Color.fromARGB(255, 224, 223, 223),
-            //     const Color.fromARGB(255, 184, 184, 184),
-            //     Colors.white,
-            //   ],
-            //   stops: const [0.0, 0.5, 1.0],
-            // ),
-            color: Colors.white,
-          ),
-        ),
+    return studentState.when(
+      data: (etudiant) => Stack(
+        children: [
+          // Widget 0 : Le fond en dégradé oblique (inchangé)
+          // Container(
+          //   decoration: BoxDecoration(
+          //     gradient: LinearGradient(
+          //       begin: Alignment.bottomLeft,
+          //       end: Alignment.topRight,
+          //       colors: [
+          //         // const Color.fromARGB(255, 184, 184, 184),
+          //         Colors.white,
+          //       ],
+          //       stops: const [0.0, 1.0],
+          //     ),
+          //   ),
+          // ),
 
-        // Widget 1 : Le contenu principal (Maintenant un ListView pour le défilement)
-        SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.only(top: 10.0),
-            children: <Widget>[
-              userHeader(),
-              const SizedBox(height: 10),
-              metricCard(),
-              const SizedBox(height: 10),
-              inscriptionStatusCard(),
-              const SizedBox(height: 10),
-              balanceCard(), // WIDGET MAINTENU ET NON CASSÉ
-              const SizedBox(height: 10),
-              // INTÉGRATION DE LA LISTE DES TRANSACTIONS
-              transactionsList(),
-              const SizedBox(height: 20), // Espace en bas de la liste
-            ],
+          // Widget 1 : Le contenu principal (Maintenant un ListView pour le défilement)
+          SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.only(top: 10.0),
+              children: <Widget>[
+                (etudiant != null) ? userHeader(etudiant) : Container(),
+                const SizedBox(height: 10),
+                metricCard(),
+                const SizedBox(height: 10),
+                // inscriptionStatusCard(),
+                const SizedBox(height: 10),
+                // balanceCard(), // WIDGET MAINTENU ET NON CASSÉ
+                const SizedBox(height: 10),
+                // INTÉGRATION DE LA LISTE DES TRANSACTIONS
+                // transactionsList(),
+                const SizedBox(height: 20), // Espace en bas de la liste
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stackTrace) =>
+          Center(child: Text('Erreur de chargement de l\'étudiant: $error')),
     );
   }
 
   // --- WIDGETS DE TRAITEMENT DES TRANSACTIONS (Logique inchangée depuis la correction précédente) ---
 
   // Gérer le paiement (pending)
-  void _handlePayment(Transaction transaction) async {
-    try {
-      final payAction = ref.read(payRechargeActionProvider);
+  // void _handlePayment(Recharge recharge) async {
+  //   try {
+  //     final rechargeNotifier = ref.read(rechargeProvider.notifier);
+  //     final success = await rechargeNotifier.updateRechargeStatus(
+  //       orderNumber: recharge.orderNumber,
+  //       transactionId: 'TXN_${DateTime.now().millisecondsSinceEpoch}',
+  //       status: 'completed',
+  //     );
 
-      await payAction(
-        rechargeId: transaction.id,
-        transactionData: {
-          'orderNumber': transaction.orderNumber,
-          'amount': transaction.amount,
-          'currency': transaction.currency,
-          'phone': transaction.phone,
-        },
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Paiement effectué'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
+  //     if (mounted && success) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(
+  //           content: Text('Paiement effectué'),
+  //           backgroundColor: Colors.green,
+  //         ),
+  //       );
+  //     } else if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(
+  //           content: Text('Erreur lors du paiement'),
+  //           backgroundColor: Colors.red,
+  //         ),
+  //       );
+  //     }
+  //   } catch (e) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+  //       );
+  //     }
+  //   }
+  // }
 
   // Créditer le solde (ok)
-  void _handleCredit(Transaction transaction) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Solde crédité de ${transaction.amount} ${transaction.currency}',
-        ),
-      ),
-    );
-    // La mise à jour sera faite via l'API
-  }
+  // void _handleCredit(Recharge recharge) {
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     SnackBar(
+  //       content: Text(
+  //         'Solde crédité de ${recharge.amount} ${recharge.currency}',
+  //       ),
+  //     ),
+  //   );
+  // }
 
   // Supprimer la transaction (no et failed)
-  void _handleDelete(Transaction transaction) async {
-    final etudiantId = ref.read(authProvider).user!.etudiant.id;
+  // void _handleDelete(Recharge recharge) async {
+  //   final confirm = await showDialog<bool>(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('Confirmer la suppression'),
+  //       content: Text(
+  //         'Êtes-vous sûr de vouloir supprimer cette recharge de ${recharge.amount} ${recharge.currency}?',
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context, false),
+  //           child: const Text('Annuler'),
+  //         ),
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context, true),
+  //           child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
 
-    // Lire la fonction d'action Riverpod
-    final deleteAction = ref.read(deleteRechargeActionProvider);
+  //   if (confirm == true && mounted) {
+  //     try {
+  //       final rechargeNotifier = ref.read(rechargeProvider.notifier);
+  //       final success = await rechargeNotifier.deleteRecharge(recharge.id);
 
-    try {
-      // Appeler l'action qui gère l'API et la mise à jour du store local
-      await deleteAction(rechargeId: transaction.id, etudiantId: etudiantId);
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Transaction supprimée')));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors de la suppression: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
+  //       if (success && mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(
+  //             content: Text('Recharge supprimée avec succès'),
+  //             backgroundColor: Colors.green,
+  //           ),
+  //         );
+  //       } else if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(
+  //             content: Text('Erreur lors de la suppression'),
+  //             backgroundColor: Colors.red,
+  //           ),
+  //         );
+  //       }
+  //     } catch (e) {
+  //       if (mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           SnackBar(
+  //             content: Text('Erreur lors de la suppression: $e'),
+  //             backgroundColor: Colors.red,
+  //           ),
+  //         );
+  //       }
+  //     }
+  //   }
+  // }
   // void _handleDelete(Transaction transaction) async {
   //   final confirm = await showDialog<bool>(
   //     context: context,
@@ -211,268 +254,248 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   // }
 
   // Afficher les détails dans une bottom sheet (completed)
-  void _showTransactionDetails(Transaction transaction) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            bool isChecking = false;
-            String? checkStatus;
+  // void _showTransactionDetails(Transaction transaction) {
+  //   showModalBottomSheet(
+  //     context: context,
+  //     shape: const RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  //     ),
+  //     builder: (context) {
+  //       return StatefulBuilder(
+  //         builder: (context, setState) {
+  //           bool isChecking = false;
+  //           String? checkStatus;
 
-            return Container(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 50,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[400],
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Détails de la Transaction',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildDetailRow('ID Transaction:', transaction.id),
-                  _buildDetailRow(
-                    'Numéro de Commande:',
-                    transaction.orderNumber,
-                  ),
-                  _buildDetailRow(
-                    'Date:',
-                    transaction.createdAt.toString().split('.')[0],
-                  ),
-                  _buildDetailRow(
-                    'Montant:',
-                    '${transaction.amount} ${transaction.currency}',
-                  ),
-                  _buildDetailRow('Téléphone:', transaction.phone),
-                  _buildDetailRow('Statut:', transaction.status),
-                  _buildDetailRow(
-                    'Méthode de paiement:',
-                    transaction.paymentMethod,
-                  ),
-                  _buildDetailRow('Description:', transaction.description),
-                  if (checkStatus != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 20),
-                      child: Text(
-                        checkStatus!,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: checkStatus!.contains('succès')
-                              ? Colors.green
-                              : Colors.orange,
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-                  if (transaction.status == 'pending')
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: isChecking
-                            ? null
-                            : () async {
-                                setState(() {
-                                  isChecking = true;
-                                  checkStatus = null;
-                                });
-                                try {
-                                  final checkAction = ref.read(
-                                    checkRechargeStatusActionProvider,
-                                  );
-                                  final status = await checkAction(
-                                    transaction.orderNumber,
-                                  );
-                                  setState(() {
-                                    checkStatus =
-                                        'Statut: ${status.status} - ${status.message}';
-                                  });
-                                } catch (e) {
-                                  setState(() {
-                                    checkStatus = 'Erreur: $e';
-                                  });
-                                } finally {
-                                  setState(() {
-                                    isChecking = false;
-                                  });
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: Text(
-                          isChecking
-                              ? 'Vérification...'
-                              : 'Vérifier le Paiement',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text(
-                        'Fermer',
-                        style: TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
+  //           return Container(
+  //             padding: const EdgeInsets.all(20.0),
+  //             child: Column(
+  //               mainAxisSize: MainAxisSize.min,
+  //               crossAxisAlignment: CrossAxisAlignment.start,
+  //               children: [
+  //                 Center(
+  //                   child: Container(
+  //                     width: 50,
+  //                     height: 5,
+  //                     decoration: BoxDecoration(
+  //                       color: Colors.grey[400],
+  //                       borderRadius: BorderRadius.circular(3),
+  //                     ),
+  //                   ),
+  //                 ),
+  //                 const SizedBox(height: 20),
+  //                 const Text(
+  //                   'Détails de la Transaction',
+  //                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+  //                 ),
+  //                 const SizedBox(height: 20),
+  //                 _buildDetailRow('ID Transaction:', transaction.id),
+  //                 _buildDetailRow(
+  //                   'Numéro de Commande:',
+  //                   transaction.orderNumber,
+  //                 ),
+  //                 _buildDetailRow(
+  //                   'Date:',
+  //                   transaction.createdAt.toString().split('.')[0],
+  //                 ),
+  //                 _buildDetailRow(
+  //                   'Montant:',
+  //                   '${transaction.amount} ${transaction.currency}',
+  //                 ),
+  //                 _buildDetailRow('Téléphone:', transaction.phone),
+  //                 _buildDetailRow('Statut:', transaction.status),
+  //                 _buildDetailRow(
+  //                   'Méthode de paiement:',
+  //                   transaction.paymentMethod,
+  //                 ),
+  //                 _buildDetailRow('Description:', transaction.description),
+  //                 if (checkStatus != null)
+  //                   Padding(
+  //                     padding: const EdgeInsets.only(top: 20),
+  //                     child: Text(
+  //                       checkStatus!,
+  //                       style: TextStyle(
+  //                         fontSize: 14,
+  //                         color: checkStatus!.contains('succès')
+  //                             ? Colors.green
+  //                             : Colors.orange,
+  //                       ),
+  //                     ),
+  //                   ),
+  //                 const SizedBox(height: 20),
+  //                 if (transaction.status == 'pending')
+  //                   SizedBox(
+  //                     width: double.infinity,
+  //                     child: ElevatedButton(
+  //                       onPressed: isChecking
+  //                           ? null
+  //                           : () async {
+  //                               setState(() {
+  //                                 isChecking = true;
+  //                                 checkStatus = null;
+  //                               });
+  //                               try {
+  //                                 final checkAction = ref.read(
+  //                                   checkRechargeStatusActionProvider,
+  //                                 );
+  //                                 final status = await checkAction(
+  //                                   transaction.orderNumber,
+  //                                 );
+  //                                 setState(() {
+  //                                   checkStatus =
+  //                                       'Statut: ${status.status} - ${status.message}';
+  //                                 });
+  //                               } catch (e) {
+  //                                 setState(() {
+  //                                   checkStatus = 'Erreur: $e';
+  //                                 });
+  //                               } finally {
+  //                                 setState(() {
+  //                                   isChecking = false;
+  //                                 });
+  //                               }
+  //                             },
+  //                       style: ElevatedButton.styleFrom(
+  //                         backgroundColor: Colors.blue,
+  //                         padding: const EdgeInsets.symmetric(vertical: 12),
+  //                       ),
+  //                       child: Text(
+  //                         isChecking
+  //                             ? 'Vérification...'
+  //                             : 'Vérifier le Paiement',
+  //                         style: const TextStyle(color: Colors.white),
+  //                       ),
+  //                     ),
+  //                   ),
+  //                 const SizedBox(height: 8),
+  //                 SizedBox(
+  //                   width: double.infinity,
+  //                   child: ElevatedButton(
+  //                     onPressed: () => Navigator.pop(context),
+  //                     style: ElevatedButton.styleFrom(
+  //                       backgroundColor: Colors.black,
+  //                       padding: const EdgeInsets.symmetric(vertical: 12),
+  //                     ),
+  //                     child: const Text(
+  //                       'Fermer',
+  //                       style: TextStyle(color: Colors.white, fontSize: 16),
+  //                     ),
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //           );
+  //         },
+  //       );
+  //     },
+  //   );
+  // }
 
   // Widget utilitaire pour afficher les détails (inchangé)
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey,
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Widget _buildDetailRow(String label, String value) {
+  //   return Padding(
+  //     padding: const EdgeInsets.symmetric(vertical: 8.0),
+  //     child: Row(
+  //       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //       children: [
+  //         Text(
+  //           label,
+  //           style: const TextStyle(
+  //             fontSize: 14,
+  //             fontWeight: FontWeight.w500,
+  //             color: Colors.grey,
+  //           ),
+  //         ),
+  //         Text(
+  //           value,
+  //           style: const TextStyle(
+  //             fontSize: 14,
+  //             fontWeight: FontWeight.bold,
+  //             color: Colors.black,
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   // --- WIDGET DE LISTE DES TRANSACTIONS (transactionList) ---
 
-  Widget transactionsList() {
-    // 1. Lire l'ID de l'étudiant (à partir de votre AuthProvider)
-    final authState = ref.watch(authProvider);
-    final etudiantId = authState.user?.etudiant.id;
+  // Widget transactionsList() {
+  //   // Écouter les recharges via le nouveau provider
+  //   final rechargesAsync = ref.watch(rechargeProvider);
 
-    if (etudiantId == null) {
-      return const SizedBox.shrink(); // Ne rien afficher si non authentifié
-    }
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       const Padding(
+  //         padding: EdgeInsets.symmetric(horizontal: 16.0),
+  //         child: Text(
+  //           'Recharges Récentes',
+  //           style: TextStyle(
+  //             fontSize: 18,
+  //             fontWeight: FontWeight.bold,
+  //             color: Colors.black,
+  //           ),
+  //         ),
+  //       ),
+  //       const SizedBox(height: 12),
+  //       // Charger les recharges via le nouveau provider
+  //       rechargesAsync.when(
+  //         data: (recharges) {
+  //           if (recharges.isEmpty) {
+  //             return const Padding(
+  //               padding: EdgeInsets.symmetric(horizontal: 16.0),
+  //               child: Center(
+  //                 child: Text(
+  //                   'Aucune recharge trouvée',
+  //                   style: TextStyle(color: Colors.grey),
+  //                 ),
+  //               ),
+  //             );
+  //           }
 
-    // 2. Charger les recharges via le StateNotifierProvider.family
-    final rechargesAsync = ref.watch(userRechargesNotifierProvider(etudiantId));
-    // Utilisation d'un Column pour le titre et la liste
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0),
-          child: Text(
-            'Recharges Récentes',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        // Charger les recharges via Riverpod
-        rechargesAsync.when(
-          data: (transactions) {
-            if (transactions.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0),
-                child: Center(
-                  child: Text(
-                    'Aucune recharge trouvée',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ),
-              );
-            }
-
-            return Column(
-              children: transactions.map((transaction) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: TransactionCard(
-                    transaction: transaction,
-                    onPayment: () => _handlePayment(transaction),
-                    onCredit: () => _handleCredit(transaction),
-                    onDelete: () => _handleDelete(transaction),
-                    onDetails: () => _showTransactionDetails(transaction),
-                  ),
-                );
-              }).toList(),
-            );
-          },
-          loading: () => const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          error: (error, stackTrace) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Center(
-              child: Text(
-                'Erreur: $error',
-                style: const TextStyle(color: Colors.red),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  //           return Column(
+  //             children: recharges.map((recharge) {
+  //               return Padding(
+  //                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
+  //                 child: RechargeCard(
+  //                   recharge: recharge,
+  //                   onPayment: () => _handlePayment(recharge),
+  //                   onCredit: () => _handleCredit(recharge),
+  //                   onDelete: () => _handleDelete(recharge),
+  //                   onDetails: () => _showRechargeDetails(recharge),
+  //                 ),
+  //               );
+  //             }).toList(),
+  //           );
+  //         },
+  //         loading: () => const Padding(
+  //           padding: EdgeInsets.symmetric(horizontal: 16.0),
+  //           child: Center(child: CircularProgressIndicator()),
+  //         ),
+  //         error: (error, stackTrace) => Padding(
+  //           padding: const EdgeInsets.symmetric(horizontal: 16.0),
+  //           child: Center(
+  //             child: Text(
+  //               'Erreur: $error',
+  //               style: const TextStyle(color: Colors.red),
+  //             ),
+  //           ),
+  //         ),
+  //       ),
+  //     ],
+  //   );
+  // }
 
   // --- WIDGETS PRÉCÉDENTS MAINTENUS INTACTS ---
 
-  Widget userHeader() {
+  Widget userHeader(Etudiant etudiant) {
     // Utiliser le Consumer pour accéder à l'état d'authentification
     return SizedBox(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Consumer(
           builder: (context, ref, child) {
-            final authState = ref.watch(authProvider);
-
-            // Si pas d'utilisateur authentifié
-            if (authState.user == null) {
-              return const Center(child: Text('Non authentifié'));
-            }
-
-            final user = authState.user!;
-            final etudiant = user.etudiant;
-            final promotion = user.promotion;
-            final annee = user.annee;
-
             return Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -514,12 +537,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                 ),
                 IconButton(
-                  onPressed: () {
+                  onPressed: () async {
                     // Déconnexion
-                    ref.read(authProvider.notifier).signOut();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Déconnecté avec succès')),
-                    );
+                    await ref.read(authProvider.notifier).logout();
+                    await ref.read(etudiantProvider.notifier).clearEtudiant();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Déconnecté avec succès')),
+                      );
+                    }
                   },
                   icon: const Icon(
                     Icons.logout_rounded,
@@ -541,28 +567,40 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Consumer(
         builder: (context, ref, child) {
-          final authState = ref.watch(authProvider);
+          late final Annee annee;
+          late final Promotion promotion;
 
-          // Données par défaut si non authentifié
-          String anneeDesignation = "2024 - 2025";
+          String anneeDesignation = "-";
           String promotionDesignation = "Promotion";
           String niveau = "N/A";
           String cycle = "N/A";
           int totalSemestres = 0;
           int totalCredits = 0;
 
-          if (authState.user != null) {
-            final user = authState.user!;
-            anneeDesignation = "${user.annee.debut} - ${user.annee.fin}";
-            promotionDesignation = user.promotion.designation;
-            niveau = user.promotion.niveau;
-            cycle = user.promotion.cycle;
-            totalSemestres = user.promotion.semestres.length;
-            totalCredits = user.promotion.semestres.fold(
-              0,
-              (value, Semestre element) => value + element.credits,
-            );
-          }
+          final anneeSync = ref.watch(anneeProvider);
+          final promotionSync = ref.watch(promotionProvider);
+
+          anneeSync.whenData((data) {
+            if (data != null) {
+              annee = data;
+            }
+          });
+
+          promotionSync.whenData((data) {
+            if (data != null) {
+              promotion = data;
+            }
+          });
+
+          anneeDesignation = "${annee.debut} - ${annee.fin}";
+          promotionDesignation = promotion.designation;
+          niveau = promotion.niveau;
+          cycle = promotion.cycle;
+          totalSemestres = promotion.semestres.length;
+          totalCredits = promotion.semestres.fold(
+            0,
+            (sum, semestre) => sum + semestre.credits,
+          );
 
           return Container(
             decoration: BoxDecoration(
@@ -705,147 +743,240 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   // inscriptionStatusCard : Affiche le statut d'inscription
-  Widget inscriptionStatusCard() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Consumer(
-        builder: (context, ref, child) {
-          final authState = ref.watch(authProvider);
+  // Widget inscriptionStatusCard() {
+  //   return Padding(
+  //     padding: const EdgeInsets.symmetric(horizontal: 16.0),
+  //     child: Consumer(
+  //       builder: (context, ref, child) {
+  //         final authNotifier = ref.read(authProvider.notifier);
+  //         final statut = authNotifier.status ?? "Non disponible";
 
-          String statut = "Non disponible";
+  //         // Couleur basée sur le statut
+  //         Color statusColor = Colors.grey;
+  //         if (statut.toLowerCase() == 'actif' ||
+  //             statut.toLowerCase() == 'inscrit') {
+  //           statusColor = Colors.green;
+  //         } else if (statut.toLowerCase() == 'en attente') {
+  //           statusColor = Colors.orange;
+  //         }
 
-          if (authState.user != null) {
-            statut = authState.user!.statut;
-          }
-
-          // Couleur basée sur le statut
-          Color statusColor = Colors.grey;
-          if (statut.toLowerCase() == 'actif' ||
-              statut.toLowerCase() == 'inscrit') {
-            statusColor = Colors.green;
-          } else if (statut.toLowerCase() == 'en attente') {
-            statusColor = Colors.orange;
-          }
-
-          return Container(
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              border: Border.all(color: statusColor.withOpacity(0.3), width: 1),
-              borderRadius: BorderRadius.circular(12.0),
-              color: statusColor.withOpacity(0.05),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Statut d\'Inscription',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8.0),
-                    Text(
-                      statut,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.all(12.0),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: statusColor.withOpacity(0.1),
-                  ),
-                  child: Icon(
-                    Icons.check_circle_outline,
-                    color: statusColor,
-                    size: 24,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
+  //         return Container(
+  //           padding: const EdgeInsets.all(16.0),
+  //           decoration: BoxDecoration(
+  //             border: Border.all(color: statusColor.withOpacity(0.3), width: 1),
+  //             borderRadius: BorderRadius.circular(12.0),
+  //             color: statusColor.withOpacity(0.05),
+  //           ),
+  //           child: Row(
+  //             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //             children: [
+  //               Column(
+  //                 crossAxisAlignment: CrossAxisAlignment.start,
+  //                 children: [
+  //                   const Text(
+  //                     'Statut d\'Inscription',
+  //                     style: TextStyle(
+  //                       fontSize: 12,
+  //                       color: Colors.grey,
+  //                       fontWeight: FontWeight.w500,
+  //                     ),
+  //                   ),
+  //                   const SizedBox(height: 8.0),
+  //                   Text(
+  //                     statut,
+  //                     style: TextStyle(
+  //                       fontSize: 16,
+  //                       fontWeight: FontWeight.bold,
+  //                       color: statusColor,
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
+  //               Container(
+  //                 padding: const EdgeInsets.all(12.0),
+  //                 decoration: BoxDecoration(
+  //                   shape: BoxShape.circle,
+  //                   color: statusColor.withOpacity(0.1),
+  //                 ),
+  //                 child: Icon(
+  //                   Icons.check_circle_outline,
+  //                   color: statusColor,
+  //                   size: 24,
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         );
+  //       },
+  //     ),
+  //   );
+  // }
 
   // balanceCard : REVENU À SA VERSION ORIGINALE (AVEC BUTTON_ROW)
-  Widget balanceCard() {
-    return Consumer(
-      builder: (context, ref, child) {
-        final authState = ref.watch(authProvider);
+  // Widget balanceCard() {
+  //   return Consumer(
+  //     builder: (context, ref, child) {
+  //       final etudiantAsync = ref.watch(etudiantProvider);
 
-        // Données par défaut si non authentifié
-        int soldeValue = 0;
+  //       return etudiantAsync.when(
+  //         data: (etudiant) {
+  //           final soldeValue = etudiant?.solde ?? 0;
 
-        if (authState.user != null) {
-          soldeValue = authState.user!.etudiant.solde;
-        }
+  //           return Padding(
+  //             padding: const EdgeInsets.symmetric(horizontal: 16.0),
+  //             child: Column(
+  //               crossAxisAlignment: CrossAxisAlignment.start,
+  //               children: [
+  //                 const Text(
+  //                   "Balance solde",
+  //                   style: TextStyle(fontSize: 14, color: Colors.black87),
+  //                 ),
+  //                 const SizedBox(height: 8.0),
+  //                 Text(
+  //                   "$soldeValue FC",
+  //                   style: const TextStyle(
+  //                     fontSize: 24,
+  //                     fontWeight: FontWeight.bold,
+  //                     color: Colors.black,
+  //                   ),
+  //                 ),
+  //                 const SizedBox(height: 16.0),
+  //                 ButtonRow(
+  //                   leftButtonTitle: "Recharger",
+  //                   leftButtonIcon: Icons.add,
+  //                   leftButtonOnTap: () {
+  //                     showModalBottomSheet(
+  //                       context: context,
+  //                       isScrollControlled: true,
+  //                       shape: const RoundedRectangleBorder(
+  //                         borderRadius: BorderRadius.vertical(
+  //                           top: Radius.circular(20),
+  //                         ),
+  //                       ),
+  //                       builder: (context) => const RechargeBottomSheet(),
+  //                     );
+  //                   },
+  //                   rightButtonTitle: "Historique",
+  //                   rightButtonIcon: Icons.history,
+  //                   rightButtonOnTap: () {
+  //                     print('Historique tapped');
+  //                     ScaffoldMessenger.of(context).showSnackBar(
+  //                       const SnackBar(
+  //                         content: Text('Historique des transactions'),
+  //                   ),
+  //                 );
+  //               },
+  //               isDarkMode: true,
+  //             ),
+  //           ],
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Balance solde",
-                style: TextStyle(fontSize: 14, color: Colors.black87),
-              ),
-              const SizedBox(height: 8.0),
-              Text(
-                "$soldeValue FC",
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 16.0),
-              // Utilisation du ButtonRow comme dans ton code initial
-              // NOTE: Le widget ButtonRow doit exister dans ton projet pour que ceci fonctionne
-              // Si ButtonRow n'est pas un widget standard ou n'est pas fourni, le code peut échouer ici.
-              ButtonRow(
-                leftButtonTitle: "Recharger",
-                leftButtonIcon: Icons.add,
-                leftButtonOnTap: () {
-                  // Afficher la bottom sheet de recharge
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(20),
-                      ),
-                    ),
-                    builder: (context) => const RechargeBottomSheet(),
-                  );
-                },
-                rightButtonTitle: "Historique",
-                rightButtonIcon: Icons.history,
-                rightButtonOnTap: () {
-                  print('Historique tapped');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Historique des transactions'),
-                    ),
-                  );
-                },
-                isDarkMode: true,
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+  // // Méthode pour afficher les détails d'une recharge
+  // void _showRechargeDetails(Recharge recharge) {
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('Détails de la recharge'),
+  //       content: Column(
+  //         mainAxisSize: MainAxisSize.min,
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           Text('Montant: ${recharge.amount} ${recharge.currency}'),
+  //           Text('Numéro: ${recharge.orderNumber}'),
+  //           Text('Téléphone: ${recharge.phone}'),
+  //           Text('Statut: ${recharge.status}'),
+  //           Text('Description: ${recharge.description}'),
+  //           if (recharge.createdAt != null)
+  //             Text('Date: ${recharge.createdAt!.toString()}'),
+  //         ],
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text('Fermer'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 }
+
+// Widget temporaire RechargeCard
+// class RechargeCard extends StatelessWidget {
+//   final Recharge recharge;
+//   final VoidCallback onPayment;
+//   final VoidCallback onCredit;
+//   final VoidCallback onDelete;
+//   final VoidCallback onDetails;
+
+//   const RechargeCard({
+//     Key? key,
+//     required this.recharge,
+//     required this.onPayment,
+//     required this.onCredit,
+//     required this.onDelete,
+//     required this.onDetails,
+//   }) : super(key: key);
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Card(
+//       margin: const EdgeInsets.only(bottom: 8.0),
+//       child: ListTile(
+//         title: Text('${recharge.amount} ${recharge.currency}'),
+//         subtitle: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Text('Numéro: ${recharge.orderNumber}'),
+//             Text('Statut: ${recharge.status}'),
+//             if (recharge.createdAt != null)
+//               Text('Date: ${recharge.createdAt!.toString().split(' ')[0]}'),
+//           ],
+//         ),
+//         trailing: PopupMenuButton<String>(
+//           onSelected: (value) {
+//             switch (value) {
+//               case 'pay':
+//                 onPayment();
+//                 break;
+//               case 'credit':
+//                 onCredit();
+//                 break;
+//               case 'delete':
+//                 onDelete();
+//                 break;
+//               case 'details':
+//                 onDetails();
+//                 break;
+//             }
+//           },
+//           itemBuilder: (context) => [
+//             if (recharge.status == 'pending')
+//               const PopupMenuItem(
+//                 value: 'pay',
+//                 child: Text('Payer'),
+//               ),
+//             if (recharge.status == 'completed')
+//               const PopupMenuItem(
+//                 value: 'credit',
+//                 child: Text('Créditer'),
+//               ),
+//             const PopupMenuItem(
+//               value: 'details',
+//               child: Text('Détails'),
+//             ),
+//             if (recharge.status == 'failed' || recharge.status == 'cancelled')
+//               const PopupMenuItem(
+//                 value: 'delete',
+//                 child: Text('Supprimer'),
+//               ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }

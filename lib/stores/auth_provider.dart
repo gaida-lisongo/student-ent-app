@@ -30,10 +30,6 @@ class AuthAsyncNotifier extends AsyncNotifier<String?> {
           },
         ),
       );
-
-      print('Login response status: ${response.statusCode}');
-      print('Login response data: ${response.data}');
-
       if (response.statusCode == 200) {
         final responseData = response.data as Map<String, dynamic>;
 
