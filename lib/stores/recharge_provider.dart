@@ -6,13 +6,11 @@ import 'package:student_app/stores/dio_prodiver.dart';
 import 'package:student_app/stores/student_provider.dart';
 
 class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
-  late final Dio _dio;
+  late final Dio _dio = ref.read(dioProvider);
   late final Etudiant currentEtudiant;
 
   @override
   Future<List<Recharge>> build() async {
-    _dio = ref.read(dioProvider);
-
     final etudiantState = ref.watch(etudiantProvider);
 
     // Éviter les appels multiples en attendant directement l'AsyncValue
@@ -39,8 +37,6 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
           throw Exception('Format de réponse inattendu');
         }
 
-        print('Recharges récupérées: $data');
-
         final sortedRecharges =
             data
                 .map((json) => Recharge.fromJson(json as Map<String, dynamic>))
@@ -60,27 +56,6 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
     } catch (e) {
       throw Exception('Erreur lors du chargement des recharges: $e');
     }
-  }
-
-  // Méthode publique pour refetch les recharges
-  Future<void> refetchRecharges() async {
-    final etudiantState = ref.read(etudiantProvider);
-
-    await etudiantState.when(
-      data: (etudiant) async {
-        if (etudiant != null) {
-          state = const AsyncValue.loading();
-          try {
-            final recharges = await _fetchRecharges(etudiant.id);
-            state = AsyncValue.data(recharges);
-          } catch (e, st) {
-            state = AsyncValue.error(e, st);
-          }
-        }
-      },
-      loading: () async {},
-      error: (_, __) async {},
-    );
   }
 
   Future<Recharge> _createRecharge({
@@ -121,7 +96,7 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
     }
   }
 
-  Future<Recharge> _updateRecharge({
+  Future<Recharge> _makingPayement({
     required String currency,
     required String phone,
     required double amount,
@@ -141,7 +116,15 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
 
       if (response.statusCode == 200) {
         final responseData = response.data as Map<String, dynamic>;
-        return Recharge.fromJson(responseData);
+        if (responseData['success'] == true && responseData['data'] != null) {
+          return Recharge.fromJson(
+            responseData['data'] as Map<String, dynamic>,
+          );
+        } else {
+          throw Exception(
+            'Format de réponse inattendu: ${responseData['message'] ?? 'Erreur inconnue'}',
+          );
+        }
       } else {
         throw Exception('Failed to update recharge: ${response.statusCode}');
       }
@@ -152,7 +135,7 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
 
   Future<bool> _deleteRecharge(String rechargeId) async {
     try {
-      final response = await _dio.delete('/recharges/$rechargeId');
+      final response = await _dio.delete('/recharges/$rechargeId?force=true');
 
       if (response.statusCode == 200) {
         return true;
@@ -179,10 +162,58 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
     }
   }
 
+  // Helper pour mettre à jour le statut d'une recharge localement
+  void _updateRechargeStatusLocally(String orderNumber, String newStatus) {
+    state.whenData((currentRecharges) {
+      final updatedRecharges = currentRecharges.map((recharge) {
+        if (recharge.orderNumber != null &&
+            recharge.orderNumber == orderNumber) {
+          return recharge.copyWith(
+            status: newStatus,
+            updatedAt: DateTime.now(),
+          );
+        }
+        return recharge;
+      }).toList();
+      state = AsyncValue.data(updatedRecharges);
+    });
+  }
+
   // Méthode publique pour vérifier une recharge
   Future<Map<String, dynamic>> checkRecharge(String orderNumber) async {
     try {
-      return await _checkingRecharge(orderNumber: orderNumber);
+      final response = await _checkingRecharge(orderNumber: orderNumber);
+
+      print(response['data'].toString());
+      // Vérifier si la réponse contient newBalance pour mettre à jour le solde
+      if (response is Map<String, dynamic> &&
+          response['success'] == true &&
+          response['data'] != null &&
+          response['data']['newBalance'] != null) {
+        // Mettre à jour le solde utilisateur avec la nouvelle approche
+        final etudiantNotifier = ref.read(etudiantProvider.notifier);
+        final newBalance = (response['data']['newBalance'] as num).toDouble();
+
+        // Essayer d'abord de récupérer les données fraîches du serveur
+        try {
+          await etudiantNotifier.refreshSolde();
+        } catch (e) {
+          // En cas d'échec, utiliser le newBalance fourni localement
+          await etudiantNotifier.updateSoldeLocally(newBalance);
+        }
+
+        // Mettre à jour le statut de la recharge localement
+        _updateRechargeStatusLocally(orderNumber, 'completed');
+      }
+      // Vérifier si le statut a changé même si success=false
+      else if (response is Map<String, dynamic> &&
+          response['data'] != null &&
+          response['data']['status'] != null) {
+        final newStatus = response['data']['status'] as String;
+        _updateRechargeStatusLocally(orderNumber, newStatus);
+      }
+
+      return response;
     } catch (e) {
       return {
         'success': false,
@@ -190,6 +221,27 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
         'data': null,
       };
     }
+  }
+
+  // Méthode publique pour refetch les recharges
+  Future<void> refetchRecharges() async {
+    final etudiantState = ref.read(etudiantProvider);
+
+    await etudiantState.when(
+      data: (etudiant) async {
+        if (etudiant != null) {
+          state = const AsyncValue.loading();
+          try {
+            final recharges = await _fetchRecharges(etudiant.id);
+            state = AsyncValue.data(recharges);
+          } catch (e, st) {
+            state = AsyncValue.error(e, st);
+          }
+        }
+      },
+      loading: () async {},
+      error: (_, __) async {},
+    );
   }
 
   // Méthode publique pour recharger les données
@@ -253,6 +305,46 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
     );
   }
 
+  Future<void> createPaymement({
+    required String currency,
+    required String phone,
+    required double amount,
+    required String description,
+    required String id,
+  }) async {
+    // Sauvegarder l'état actuel avant le loading
+    final currentState = state;
+    state = const AsyncValue.loading();
+
+    try {
+      final updatedRecharge = await _makingPayement(
+        currency: currency,
+        phone: phone,
+        amount: amount,
+        description: description,
+        id: id,
+      );
+
+      print("Recharge mise à jour: ${updatedRecharge.toJson()}");
+
+      // Mettre à jour localement avec les données actuelles ou vides si pas de données
+      final currentRecharges = currentState.hasValue
+          ? currentState.value!
+          : <Recharge>[];
+      final updatedRecharges = currentRecharges.map((recharge) {
+        if (recharge.id == id) {
+          return updatedRecharge;
+        }
+        return recharge;
+      }).toList();
+
+      state = AsyncValue.data(updatedRecharges);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow; // Relancer l'exception pour que le UI puisse la capturer
+    }
+  }
+
   // Mettre à jour le statut d'une recharge via API
   Future<bool> updateRechargeStatus({
     required String orderNumber,
@@ -273,16 +365,15 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
         // Mettre à jour la recharge localement
         state.whenData((currentRecharges) {
           final updatedRecharges = currentRecharges.map((recharge) {
-            if (recharge.orderNumber == updatedOrderNumber) {
+            if (recharge.orderNumber != null &&
+                recharge.orderNumber == updatedOrderNumber) {
               final updatedRecharge = recharge.copyWith(
                 status: newStatus,
                 updatedAt: updatedAt,
               );
 
-              // Si le statut est 'completed', augmenter le solde de l'utilisateur
-              if (newStatus == 'completed') {
-                _updateUserBalance(recharge.amount);
-              }
+              // Si le statut est 'completed', noter que le serveur gère le solde
+              // Le solde sera synchronisé lors de la prochaine connexion
 
               return updatedRecharge;
             }
@@ -295,53 +386,6 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
       }
 
       return false;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  // Mettre à jour le solde de l'utilisateur
-  void _updateUserBalance(double amount) {
-    final etudiantNotifier = ref.read(etudiantProvider.notifier);
-    final currentEtudiant = ref.read(etudiantProvider).value;
-
-    if (currentEtudiant != null) {
-      final updatedEtudiant = currentEtudiant.copyWith(
-        solde: currentEtudiant.solde + amount,
-      );
-      etudiantNotifier.setEtudiant(updatedEtudiant);
-    }
-  }
-
-  // Mettre à jour une recharge existante
-  Future<bool> updateRecharge({
-    required String id,
-    required double amount,
-    required String phone,
-    required String currency,
-    required String description,
-  }) async {
-    try {
-      final updatedRecharge = await _updateRecharge(
-        id: id,
-        amount: amount,
-        phone: phone,
-        currency: currency,
-        description: description,
-      );
-
-      // Mettre à jour localement
-      state.whenData((currentRecharges) {
-        final updatedRecharges = currentRecharges.map((recharge) {
-          if (recharge.id == id) {
-            return updatedRecharge;
-          }
-          return recharge;
-        }).toList();
-        state = AsyncValue.data(updatedRecharges);
-      });
-
-      return true;
     } catch (e) {
       return false;
     }

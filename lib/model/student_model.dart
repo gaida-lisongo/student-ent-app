@@ -98,7 +98,7 @@ class Etudiant {
       lieuNaissance: lieuNaissance ?? this.lieuNaissance,
       nationalite: nationalite ?? this.nationalite,
       photo: photo ?? this.photo,
-      solde: this.solde,
+      solde: solde ?? this.solde,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

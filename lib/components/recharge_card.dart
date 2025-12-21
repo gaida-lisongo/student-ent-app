@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/components/custom_button.dart';
 import 'package:student_app/model/recharge_model.dart';
+import 'package:student_app/model/student_model.dart';
 import 'package:student_app/stores/recharge_provider.dart';
+import 'package:student_app/stores/student_provider.dart';
 
 class RechargeCard extends ConsumerWidget {
   final Recharge recharge;
@@ -122,14 +124,71 @@ class RechargeCard extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
-          // Bouton supprimer (seulement si failed ou cancelled)
-          if (recharge.status == 'failed' || recharge.status == 'cancelled')
-            Align(
-              alignment: Alignment.centerRight,
-              child: CustomButton(
-                title: 'Supprimer',
-                icon: Icons.delete,
-                onTap: () => _showDeleteConfirmation(context, ref),
+          // Boutons selon le statut
+          if (recharge.status == 'pending')
+            Consumer(
+              builder: (context, ref, child) {
+                final rechargeState = ref.watch(rechargeProvider);
+                final isLoading = rechargeState.isLoading;
+
+                return SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: isLoading
+                        ? null
+                        : () => _makePayment(context, ref),
+                    icon: isLoading
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.payment, color: Colors.white),
+                    label: Text(
+                      isLoading ? 'Traitement...' : 'Effectuer le paiement',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isLoading ? Colors.grey : Colors.green,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            )
+          else if (recharge.status == 'completed' ||
+              recharge.status == 'failed' ||
+              recharge.status == 'cancelled')
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _showDeleteConfirmation(context, ref),
+                icon: const Icon(Icons.delete, color: Colors.white),
+                label: const Text(
+                  'Supprimer',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
             ),
         ],
@@ -156,17 +215,17 @@ class RechargeCard extends ConsumerWidget {
     try {
       final rechargeNotifier = ref.read(rechargeProvider.notifier);
       final response = await rechargeNotifier.checkRecharge(
-        recharge.orderNumber,
+        recharge.orderNumber ?? 'N/A',
       );
 
       if (context.mounted) {
         Navigator.pop(context); // Fermer le loading
-        _showTransactionResult(context, response);
+        _showTransactionResult(context, ref, response);
       }
     } catch (e) {
       if (context.mounted) {
         Navigator.pop(context); // Fermer le loading
-        _showTransactionResult(context, {
+        _showTransactionResult(context, ref, {
           'success': false,
           'message': 'Erreur de connexion: $e',
           'data': null,
@@ -175,14 +234,104 @@ class RechargeCard extends ConsumerWidget {
     }
   }
 
+  // Méthode pour effectuer le paiement
+  void _makePayment(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.payment, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Paiement'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Recharge de ${recharge.amount.toStringAsFixed(2)} ${recharge.currency}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text('Numéro: ${recharge.phone}'),
+            Text('Description: ${recharge.description}'),
+            const SizedBox(height: 12),
+            const Text(
+              'Vous allez être redirigé vers votre plateforme de paiement mobile pour effectuer cette transaction.',
+              style: TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _processPayment(context, ref);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Procéder au paiement'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Traitement du paiement
+  void _processPayment(BuildContext context, WidgetRef ref) async {
+    try {
+      final rechargeNotifier = ref.read(rechargeProvider.notifier);
+      await rechargeNotifier.createPaymement(
+        currency: recharge.currency,
+        phone: recharge.phone,
+        amount: recharge.amount,
+        description: recharge.description,
+        id: recharge.id,
+      );
+
+      print("Paiement initié avec succès");
+
+      // Afficher le message de succès
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Paiement initié avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print("Erreur lors du paiement: $e");
+
+      // Afficher le message d'erreur
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   // Modal pour afficher le résultat de vérification
   void _showTransactionResult(
     BuildContext context,
+    WidgetRef ref,
     Map<String, dynamic> response,
   ) {
     final bool success = response['success'] == true;
     final String message = response['message'] ?? 'Réponse inconnue';
     final Map<String, dynamic>? data = response['data'];
+    final bool hasNewBalance = data != null && data['newBalance'] != null;
+    final bool isCompleted = data != null && data['status'] == 'completed';
+    final bool needsCreditButton = success && hasNewBalance && isCompleted;
 
     showDialog(
       context: context,
@@ -196,7 +345,7 @@ class RechargeCard extends ConsumerWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                success ? 'Transaction trouvée' : 'Vérification',
+                success ? 'Transaction vérifiée' : 'Vérification',
                 style: const TextStyle(fontSize: 16),
               ),
             ),
@@ -214,6 +363,35 @@ class RechargeCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
+            if (hasNewBalance) ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.green[200]!),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.account_balance_wallet,
+                      color: Colors.green,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Nouveau solde: ${(data['newBalance'] as num).toStringAsFixed(2)} CDF',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             if (data != null) ...[
               const Text(
                 'Détails:',
@@ -233,9 +411,109 @@ class RechargeCard extends ConsumerWidget {
           ],
         ),
         actions: [
+          if (needsCreditButton)
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _creditUser(context, ref, data);
+              },
+              icon: const Icon(
+                Icons.account_balance_wallet,
+                color: Colors.white,
+              ),
+              label: const Text(
+                'Créditer le compte',
+                style: TextStyle(color: Colors.white),
+              ),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Créditer manuellement l'utilisateur
+  void _creditUser(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> data,
+  ) {
+    final newBalance = (data['newBalance'] as num).toDouble();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Créditer le compte'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Recharge de ${recharge.amount.toStringAsFixed(2)} ${recharge.currency} terminée !',
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Nouveau solde disponible: ${newBalance.toStringAsFixed(2)} CDF',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.green,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Voulez-vous mettre à jour votre solde local avec cette valeur ?',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final etudiantState = ref.read(etudiantProvider); // AsyncValue
+              final etudiantNotifier = ref.read(
+                etudiantProvider.notifier,
+              ); // Notifier
+
+              etudiantState.whenData((etudiant) {
+                print(
+                  "Mise à jour du solde local à ${etudiant?.solde} -> $newBalance",
+                );
+                if (etudiant == null) return;
+
+                final updatedEtudiant = etudiant.copyWith(
+                  solde:
+                      newBalance, // attention, dans ton modèle c’est "solde" pas "balance"
+                );
+
+                print("New Etudiant Solde: ${updatedEtudiant.solde}");
+                etudiantNotifier.setEtudiant(updatedEtudiant);
+              });
+
+              Navigator.pop(context);
+
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Solde mis à jour: ${newBalance.toStringAsFixed(2)} CDF',
+                    ),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirmer'),
           ),
         ],
       ),

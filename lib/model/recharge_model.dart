@@ -6,7 +6,7 @@ class Recharge {
   final String phone;
   final String description;
   final String paymentMethode;
-  final String orderNumber;
+  final String? orderNumber;
   final String status;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -19,7 +19,7 @@ class Recharge {
     required this.phone,
     required this.description,
     required this.paymentMethode,
-    required this.orderNumber,
+    this.orderNumber,
     required this.status,
     this.createdAt,
     this.updatedAt,
@@ -48,7 +48,7 @@ class Recharge {
           json['paymentMethod'] as String? ??
           json['paymentMethode'] as String? ??
           'mobile_money',
-      orderNumber: json['orderNumber'] as String,
+      orderNumber: json['orderNumber'] as String?,
       status: json['status'] as String,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)

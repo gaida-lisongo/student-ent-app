@@ -73,7 +73,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: <Widget>[
                 (etudiant != null) ? userHeader(etudiant) : Container(),
                 const SizedBox(height: 10),
-                (etudiant != null) ? metricCard(etudiant) : Container(),
+                metricCard(context, ref),
                 const SizedBox(height: 10),
                 inscriptionStatusCard(),
                 const SizedBox(height: 10),
@@ -564,227 +564,195 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget metricCard(Etudiant etudiant) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Consumer(
-        builder: (context, ref, child) {
-          final anneeSync = ref.watch(anneeProvider);
-          final promotionSync = ref.watch(promotionProvider);
+  Widget metricCard(BuildContext context, WidgetRef ref) {
+    final etudiantState = ref.watch(etudiantProvider);
+    final anneeSync = ref.watch(anneeProvider);
+    final promotionSync = ref.watch(promotionProvider);
 
-          return anneeSync.when(
-            data: (annee) => promotionSync.when(
-              data: (promotion) {
-                String anneeDesignation = "-";
-                String promotionDesignation = "Promotion";
-                String niveau = "N/A";
-                String cycle = "N/A";
-                int totalSemestres = 0;
-                int totalCredits = 0;
+    return etudiantState.when(
+      data: (etudiant) {
+        if (etudiant == null) return SizedBox.shrink();
 
-                if (annee != null) {
-                  anneeDesignation = "${annee.debut} - ${annee.fin}";
-                }
+        return anneeSync.when(
+          data: (annee) => promotionSync.when(
+            data: (promotion) {
+              final anneeDesignation = annee != null
+                  ? "${annee.debut} - ${annee.fin}"
+                  : "-";
 
-                if (promotion != null) {
-                  promotionDesignation = promotion.designation;
-                  niveau = promotion.niveau;
-                  cycle = promotion.cycle;
-                  totalSemestres = promotion.semestres.length;
-                  totalCredits = promotion.semestres.fold(
+              final promotionDesignation =
+                  promotion?.designation ?? "Promotion";
+              final niveau = promotion?.niveau ?? "N/A";
+              final cycle = promotion?.cycle ?? "N/A";
+
+              final totalSemestres = promotion?.semestres.length ?? 0;
+
+              final totalCredits =
+                  promotion?.semestres.fold(
                     0,
                     (sum, semestre) => sum + semestre.credits,
-                  );
-                }
+                  ) ??
+                  0;
 
-                return Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12.0),
-                  ),
-                  child: Stack(
-                    children: [
-                      // 1. Image de fond
-                      Positioned.fill(
-                        child: ClipRRect(
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: Stack(
+                  children: [
+                    // Background
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12.0),
+                        child: Image.asset(
+                          "assets/images/metric_background.jpg",
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              Container(color: const Color(0xFF0454DD)),
+                        ),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12.0),
-                          child: Image.asset(
-                            "assets/images/metric_background.jpg",
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: const Color.fromARGB(255, 4, 84, 221),
-                              );
-                            },
+                          color: const Color.fromARGB(
+                            255,
+                            1,
+                            7,
+                            10,
+                          ).withOpacity(0.6),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Icon(
+                                Icons.home,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                              Text(
+                                anneeDesignation,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ),
-                      // 2. Calque d'opacité
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12.0),
-                            color: const Color.fromARGB(
-                              255,
-                              1,
-                              7,
-                              10,
-                            ).withOpacity(0.6),
+                          const SizedBox(height: 10),
+                          Text(
+                            "Promotion $promotionDesignation",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
                           ),
-                        ),
+                          Text(
+                            "${etudiant.solde.toStringAsFixed(2)} FC",
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            "Système : ${promotion?.systeme} | Cycle: $cycle",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Semestre",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                  Text(
+                                    "$totalSemestres",
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Crédits",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                  Text(
+                                    "$totalCredits",
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      // 3. Contenu de la carte
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Icon(
-                                  Icons.home,
-                                  size: 18,
-                                  color: Colors.white,
-                                ),
-                                Text(
-                                  anneeDesignation,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "Promotion $promotionDesignation",
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                                Text(
-                                  "${etudiant.solde} FC",
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                Text(
-                                  "Système : ${promotion?.systeme} | Cycle: $cycle",
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      "Semestre",
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                    Text(
-                                      totalSemestres.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(width: 40),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      "Crédits",
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                    Text(
-                                      totalCredits.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              loading: () => Container(
-                height: 120,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12.0),
-                  color: Colors.grey[300],
+                    ),
+                  ],
                 ),
-                child: const Center(child: CircularProgressIndicator()),
-              ),
-              error: (error, stackTrace) => Container(
-                height: 120,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12.0),
-                  color: Colors.red[100],
-                ),
-                child: const Center(
-                  child: Text(
-                    'Erreur de chargement des promotions',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                ),
-              ),
-            ),
-            loading: () => Container(
-              height: 120,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12.0),
-                color: Colors.grey[300],
-              ),
-              child: const Center(child: CircularProgressIndicator()),
-            ),
-            error: (error, stackTrace) => Container(
-              height: 120,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12.0),
-                color: Colors.red[100],
-              ),
-              child: const Center(
-                child: Text(
-                  'Erreur de chargement des années',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
+              );
+            },
+            loading: () => _placeholder(),
+            error: (_, __) => _error(),
+          ),
+          loading: () => _placeholder(),
+          error: (_, __) => _error(),
+        );
+      },
+      loading: () => _placeholder(),
+      error: (_, __) => _error(),
     );
   }
+
+  Widget _placeholder() => Container(
+    height: 120,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(12.0),
+      color: Colors.grey[300],
+    ),
+    child: const Center(child: CircularProgressIndicator()),
+  );
+
+  Widget _error() => Container(
+    height: 120,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(12.0),
+      color: Colors.red[100],
+    ),
+    child: const Center(
+      child: Text('Erreur de chargement', style: TextStyle(color: Colors.red)),
+    ),
+  );
 
   // inscriptionStatusCard : Affiche le statut d'inscription
   Widget inscriptionStatusCard() {
@@ -1494,7 +1462,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             final query = searchController.text.toLowerCase();
             filteredRecharges = allRecharges.where((recharge) {
               return recharge.phone.toLowerCase().contains(query) ||
-                  recharge.orderNumber.toLowerCase().contains(query) ||
+                  (recharge.orderNumber?.toLowerCase().contains(query) ??
+                      false) ||
                   recharge.description.toLowerCase().contains(query) ||
                   recharge.status.toLowerCase().contains(query) ||
                   recharge.amount.toString().contains(query);

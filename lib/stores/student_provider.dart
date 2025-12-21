@@ -31,6 +31,7 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
     try {
       final jsonString = jsonEncode(etudiant.toJson());
       await _storage.write(key: 'etudiant', value: jsonString);
+      print("New Etudiant Stored: $jsonString");
       state = AsyncValue.data(etudiant);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -89,6 +90,39 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
     } catch (e, st) {
       state = AsyncValue.error('Erreur de connexion au serveur: $e', st);
       return false;
+    }
+  }
+
+  // Méthode pour mettre à jour le solde en récupérant les données fraîches du serveur
+  Future<void> refreshSolde() async {
+    final currentEtudiant = state.value;
+    if (currentEtudiant?.id == null) {
+      return;
+    }
+
+    try {
+      // Récupérer les données fraîches de l'étudiant depuis le serveur
+      final response = await _dio.get('/etudiant/${currentEtudiant!.id}');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data['success'] == true && data['data'] != null) {
+          final updatedEtudiant = Etudiant.fromJson(data['data']);
+          await setEtudiant(updatedEtudiant);
+        }
+      }
+    } catch (e) {
+      // En cas d'erreur réseau, on garde le solde local
+      print('Erreur lors de la récupération du solde: $e');
+    }
+  }
+
+  // Méthode pour mettre à jour uniquement le solde localement (fallback)
+  Future<void> updateSoldeLocally(double newBalance) async {
+    final currentEtudiant = state.value;
+    if (currentEtudiant != null) {
+      final updatedEtudiant = currentEtudiant.copyWith(solde: newBalance);
+      await setEtudiant(updatedEtudiant);
     }
   }
 
