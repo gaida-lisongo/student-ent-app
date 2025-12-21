@@ -10,7 +10,7 @@ class Etudiant {
   final String? lieuNaissance;
   final String? nationalite;
   final String? photo;
-  final int solde;
+  final double solde;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -38,7 +38,7 @@ class Etudiant {
       prenom: json['prenom'] as String? ?? '',
       matricule: json['matricule'] as String? ?? '',
       sexe: json['sexe'] as String? ?? '',
-      solde: json['solde'] as int? ?? 0,
+      solde: (json['solde'] as num?)?.toDouble() ?? 0,
       dateNaissance: json['date_naissance'] != null
           ? DateTime.parse(json['date_naissance'] as String)
           : null,
@@ -70,5 +70,98 @@ class Etudiant {
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };
+  }
+
+  Etudiant copyWith({
+    String? id,
+    String? nom,
+    String? postNom,
+    String? prenom,
+    String? matricule,
+    String? sexe,
+    DateTime? dateNaissance,
+    String? lieuNaissance,
+    String? nationalite,
+    String? photo,
+    double? solde,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Etudiant(
+      id: id ?? this.id,
+      nom: nom ?? this.nom,
+      postNom: postNom ?? this.postNom,
+      prenom: prenom ?? this.prenom,
+      matricule: matricule ?? this.matricule,
+      sexe: sexe ?? this.sexe,
+      dateNaissance: dateNaissance ?? this.dateNaissance,
+      lieuNaissance: lieuNaissance ?? this.lieuNaissance,
+      nationalite: nationalite ?? this.nationalite,
+      photo: photo ?? this.photo,
+      solde: this.solde,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Etudiant &&
+        other.id == id &&
+        other.nom == nom &&
+        other.postNom == postNom &&
+        other.prenom == prenom &&
+        other.matricule == matricule &&
+        other.sexe == sexe &&
+        other.dateNaissance == dateNaissance &&
+        other.lieuNaissance == lieuNaissance &&
+        other.nationalite == nationalite &&
+        other.photo == photo &&
+        other.solde == solde &&
+        other.createdAt == createdAt &&
+        other.updatedAt == updatedAt;
+  }
+
+  @override
+  int get hashCode {
+    return Object.hash(
+      id,
+      nom,
+      postNom,
+      prenom,
+      matricule,
+      sexe,
+      dateNaissance,
+      lieuNaissance,
+      nationalite,
+      photo,
+      solde,
+      createdAt,
+      updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'Etudiant(id: $id, nom: $nom, postNom: $postNom, prenom: $prenom, matricule: $matricule, sexe: $sexe, dateNaissance: $dateNaissance, lieuNaissance: $lieuNaissance, nationalite: $nationalite, photo: $photo, solde: $solde, createdAt: $createdAt, updatedAt: $updatedAt)';
+  }
+
+  // Getter pour l'ID conforme au pattern existant
+  String get _id => id;
+
+  // Getter pour le nom complet
+  String get nomComplet => '$prenom $nom $postNom'.trim();
+
+  // Getter pour l'âge (si date de naissance disponible)
+  int? get age {
+    if (dateNaissance == null) return null;
+    final now = DateTime.now();
+    int age = now.year - dateNaissance!.year;
+    if (now.month < dateNaissance!.month ||
+        (now.month == dateNaissance!.month && now.day < dateNaissance!.day)) {
+      age--;
+    }
+    return age;
   }
 }
