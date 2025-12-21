@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/components/custom_button.dart';
+import 'package:student_app/components/recharge_card.dart';
 import 'package:student_app/model/annee_model.dart';
 import 'package:student_app/model/promotion_model.dart';
 import 'package:student_app/model/recharge_model.dart';
@@ -1087,7 +1088,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final recharge = last5Recharges[index];
-                      return rechargeCard(recharge);
+                      return RechargeCard(recharge: recharge);
                     },
                   ),
 
@@ -1128,127 +1129,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-
-  // Widget pour afficher une carte de recharge individuelle
-  Widget rechargeCard(Recharge recharge) {
-    Color statusColor;
-    IconData statusIcon;
-
-    switch (recharge.status) {
-      case 'completed':
-        statusColor = Colors.green;
-        statusIcon = Icons.check_circle;
-        break;
-      case 'pending':
-        statusColor = Colors.orange;
-        statusIcon = Icons.access_time;
-        break;
-      case 'failed':
-        statusColor = Colors.red;
-        statusIcon = Icons.error;
-        break;
-      default:
-        statusColor = Colors.grey;
-        statusIcon = Icons.help;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '${recharge.amount.toStringAsFixed(2)} ${recharge.currency}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Row(
-                children: [
-                  Icon(statusIcon, color: statusColor, size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    recharge.status.toUpperCase(),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            recharge.description,
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Tel: ${recharge.phone}',
-                style: TextStyle(color: Colors.grey[500], fontSize: 12),
-              ),
-              if (recharge.createdAt != null)
-                Text(
-                  '${recharge.createdAt!.day}/${recharge.createdAt!.month}/${recharge.createdAt!.year}',
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // // Méthode pour afficher les détails d'une recharge
-  void _showRechargeDetails(Recharge recharge) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Détails de la recharge'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Montant: ${recharge.amount} ${recharge.currency}'),
-            Text('Numéro: ${recharge.orderNumber}'),
-            Text('Téléphone: ${recharge.phone}'),
-            Text('Statut: ${recharge.status}'),
-            Text('Description: ${recharge.description}'),
-            if (recharge.createdAt != null)
-              Text('Date: ${recharge.createdAt!.toString()}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fermer'),
-          ),
-        ],
       ),
     );
   }
@@ -1657,7 +1537,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           separatorBuilder: (context, index) =>
                               const SizedBox(height: 8),
                           itemBuilder: (context, index) {
-                            return rechargeCard(filteredRecharges[index]);
+                            return RechargeCard(
+                              recharge: filteredRecharges[index],
+                            );
                           },
                         ),
                 ),
@@ -1709,7 +1591,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 itemCount: allRecharges.length,
                 separatorBuilder: (context, index) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
-                  return rechargeCard(allRecharges[index]);
+                  return RechargeCard(recharge: allRecharges[index]);
                 },
               ),
             ),
@@ -1719,79 +1601,3 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 }
-
-// Widget temporaire RechargeCard
-// class RechargeCard extends StatelessWidget {
-//   final Recharge recharge;
-//   final VoidCallback onPayment;
-//   final VoidCallback onCredit;
-//   final VoidCallback onDelete;
-//   final VoidCallback onDetails;
-
-//   const RechargeCard({
-//     Key? key,
-//     required this.recharge,
-//     required this.onPayment,
-//     required this.onCredit,
-//     required this.onDelete,
-//     required this.onDetails,
-//   }) : super(key: key);
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Card(
-//       margin: const EdgeInsets.only(bottom: 8.0),
-//       child: ListTile(
-//         title: Text('${recharge.amount} ${recharge.currency}'),
-//         subtitle: Column(
-//           crossAxisAlignment: CrossAxisAlignment.start,
-//           children: [
-//             Text('Numéro: ${recharge.orderNumber}'),
-//             Text('Statut: ${recharge.status}'),
-//             if (recharge.createdAt != null)
-//               Text('Date: ${recharge.createdAt!.toString().split(' ')[0]}'),
-//           ],
-//         ),
-//         trailing: PopupMenuButton<String>(
-//           onSelected: (value) {
-//             switch (value) {
-//               case 'pay':
-//                 onPayment();
-//                 break;
-//               case 'credit':
-//                 onCredit();
-//                 break;
-//               case 'delete':
-//                 onDelete();
-//                 break;
-//               case 'details':
-//                 onDetails();
-//                 break;
-//             }
-//           },
-//           itemBuilder: (context) => [
-//             if (recharge.status == 'pending')
-//               const PopupMenuItem(
-//                 value: 'pay',
-//                 child: Text('Payer'),
-//               ),
-//             if (recharge.status == 'completed')
-//               const PopupMenuItem(
-//                 value: 'credit',
-//                 child: Text('Créditer'),
-//               ),
-//             const PopupMenuItem(
-//               value: 'details',
-//               child: Text('Détails'),
-//             ),
-//             if (recharge.status == 'failed' || recharge.status == 'cancelled')
-//               const PopupMenuItem(
-//                 value: 'delete',
-//                 child: Text('Supprimer'),
-//               ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }

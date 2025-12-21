@@ -102,9 +102,17 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
         },
       );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final responseData = response.data as Map<String, dynamic>;
-        return Recharge.fromJson(responseData);
+        if (responseData['success'] == true && responseData['data'] != null) {
+          return Recharge.fromJson(
+            responseData['data'] as Map<String, dynamic>,
+          );
+        } else {
+          throw Exception(
+            'Format de réponse inattendu: ${responseData['message'] ?? 'Erreur inconnue'}',
+          );
+        }
       } else {
         throw Exception('Failed to create recharge: ${response.statusCode}');
       }
@@ -156,16 +164,9 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
     }
   }
 
-  Future<dynamic> _checkingRecharge({
-    required String status,
-    required String transactionId,
-    required String orderNumber,
-  }) async {
+  Future<dynamic> _checkingRecharge({required String orderNumber}) async {
     try {
-      final response = await _dio.post(
-        '/recharge/$orderNumber/status',
-        data: {'status': status, 'transactionId': transactionId},
-      );
+      final response = await _dio.get('/recharge/$orderNumber/status');
 
       if (response.statusCode == 200) {
         final responseData = response.data;
@@ -175,6 +176,19 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
       }
     } catch (e) {
       throw Exception('Erreur lors de la vérification de la recharge: $e');
+    }
+  }
+
+  // Méthode publique pour vérifier une recharge
+  Future<Map<String, dynamic>> checkRecharge(String orderNumber) async {
+    try {
+      return await _checkingRecharge(orderNumber: orderNumber);
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Erreur de vérification: $e',
+        'data': null,
+      };
     }
   }
 
@@ -246,11 +260,7 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
     required String status,
   }) async {
     try {
-      final response = await _checkingRecharge(
-        status: status,
-        transactionId: transactionId,
-        orderNumber: orderNumber,
-      );
+      final response = await _checkingRecharge(orderNumber: orderNumber);
 
       final responseData = response as Map<String, dynamic>;
 
