@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/components/custom_button.dart';
-import 'package:student_app/stores/autth_provider.dart';
+import 'package:student_app/stores/auth_provider.dart';
+import 'package:student_app/stores/student_provider.dart';
+import 'package:student_app/model/inscription_model.dart';
 
 // Le WelcomeScreen doit être un ConsumerWidget pour interagir avec Riverpod
 class WelcomeScreen extends ConsumerWidget {
@@ -18,7 +20,6 @@ class WelcomeScreen extends ConsumerWidget {
     String rawData,
   ) async {
     // 1. Lancer l'état de chargement et le processus de connexion
-    // Le AuthNotifier gère l'état et le stockage sécurisé.
     final authNotifier = ref.read(authProvider.notifier);
 
     // Fermer l'écran de scan s'il est ouvert (important pour la navigation)
@@ -26,7 +27,7 @@ class WelcomeScreen extends ConsumerWidget {
       Navigator.pop(context);
     }
 
-    // Affiche un indicateur de chargement global si le ProviderScope ne le gère pas
+    // Affiche un indicateur de chargement global
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -36,31 +37,56 @@ class WelcomeScreen extends ConsumerWidget {
       );
     }
 
-    // 2. Déclencher la connexion via le Provider
-    await authNotifier.signIn(rawData);
+    try {
+      // 2. Déclencher la connexion via le Provider
+      // Extraire l'ID d'inscription depuis l'URL
+      final uri = Uri.parse(rawData);
+      final inscriptionId = uri.pathSegments.last;
 
-    // 3. Vérifier le résultat SEULEMENT si le widget est toujours monté
-    if (!context.mounted) return;
+      final inscriptionData = await authNotifier.login(inscriptionId);
 
-    final authState = ref.read(authProvider);
-    if (authState.user != null) {
-      // Succès: La navigation vers Dashboard est gérée par AuthChecker dans main.dart
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Bienvenue, ${authState.user!.etudiant.prenom}!'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } else if (authState.errorMessage != null) {
-      // Échec
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur de connexion: ${authState.errorMessage}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      // 3. Vérifier le résultat SEULEMENT si le widget est toujours monté
+      if (!context.mounted) return;
+
+      if (inscriptionData['success'] == true &&
+          inscriptionData['data'] != null) {
+        // Créer l'objet InscriptionData depuis la réponse
+        final inscription = InscriptionData.fromJson(inscriptionData);
+
+        final etudiantNotifier = ref.read(etudiantProvider.notifier);
+        // Sauvegarder l'étudiant localement
+        await etudiantNotifier.setEtudiant(inscription.etudiant);
+
+        // Succès
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Bienvenue, ${inscription.etudiant.prenom}!'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        // Échec
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Erreur de connexion: ${inscriptionData['error'] ?? 'Erreur inconnue'}',
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de connexion: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -71,13 +97,15 @@ class WelcomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Écouter l'état pour afficher les erreurs si nécessaire, mais l'UI est simple
+    // Écouter l'état d'authentification
     final authState = ref.watch(authProvider);
+    final etudiantState = ref.watch(etudiantProvider);
 
-    // Le bouton S'AUTHENTIFIER devient le bouton SIMULATION pour l'étape actuelle
+    // Déterminer si on est en train de charger
+    final isLoading = authState.isLoading || etudiantState.isLoading;
+
     return Scaffold(
       body: Stack(
-        // ... (Contenu du Stack inchangé : Image, Dégradé) ...
         children: [
           // 1. Image de fond
           Positioned.fill(
@@ -141,13 +169,13 @@ class WelcomeScreen extends ConsumerWidget {
                 // Bouton de Simulation / Authentification
                 Center(
                   child: Opacity(
-                    opacity: authState.isLoading ? 0.6 : 1.0,
+                    opacity: isLoading ? 0.6 : 1.0,
                     child: CustomButton(
-                      title: authState.isLoading
+                      title: isLoading
                           ? 'CONNEXION EN COURS...'
                           : 'SIMULATION AUTHENTIFICATION',
                       icon: Icons.login,
-                      onTap: authState.isLoading
+                      onTap: isLoading
                           ? () {} // Callback vide pour désactiver
                           : () => _startSimulationLogin(context, ref),
                       isDarkMode: true,

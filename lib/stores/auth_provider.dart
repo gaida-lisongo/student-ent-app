@@ -17,10 +17,10 @@ class AuthAsyncNotifier extends AsyncNotifier<String?> {
     return token;
   }
 
-  Future<Map<String, dynamic>> login(String inscriptionId) async {
+  Future<Map<String, dynamic>> login(String url) async {
     state = const AsyncValue.loading();
     try {
-      final response = await _dio.get('/parcours/$inscriptionId');
+      final response = await _dio.get(url);
 
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;

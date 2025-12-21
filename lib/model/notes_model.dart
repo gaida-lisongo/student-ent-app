@@ -1,5 +1,3 @@
-import 'dart:ffi';
-
 import 'package:student_app/model/matiere_model.dart';
 import 'package:student_app/model/student_model.dart';
 
@@ -7,9 +5,9 @@ class Note {
   final String id;
   final Matiere matiereId;
   final Etudiant etudiantId;
-  final Float cmi;
-  final Float examen;
-  final Float rattrapage;
+  final double cmi;
+  final double examen;
+  final double rattrapage;
 
   Note({
     required this.id,
@@ -25,9 +23,9 @@ class Note {
       id: json['_id'] as String,
       matiereId: json['matiereId'] as Matiere,
       etudiantId: json['etudiantId'] as Etudiant,
-      cmi: json['cmi'] as Float,
-      examen: json['examen'] as Float,
-      rattrapage: json['rattrapage'] as Float,
+      cmi: json['cmi'] as double,
+      examen: json['examen'] as double,
+      rattrapage: json['rattrapage'] as double,
     );
   }
 

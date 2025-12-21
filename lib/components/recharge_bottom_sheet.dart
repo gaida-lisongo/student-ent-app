@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:student_app/stores/autth_provider.dart';
-import 'package:student_app/stores/transaction_provider.dart';
+import 'package:student_app/stores/auth_provider.dart';
+import 'package:student_app/stores/recharge_provider.dart';
 import 'package:student_app/screens/payment_status_page.dart';
 import 'package:student_app/components/custom_button.dart';
 import 'package:student_app/services/transaction_service.dart';

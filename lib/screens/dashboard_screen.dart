@@ -5,8 +5,8 @@ import 'package:student_app/components/transaction_card.dart';
 import 'package:student_app/components/recharge_bottom_sheet.dart';
 import 'package:student_app/model/student_model.dart';
 import 'package:student_app/model/transaction_model.dart'; // MAINTENU
-import 'package:student_app/stores/autth_provider.dart'; // Importer le provider d'auth
-import 'package:student_app/stores/transaction_provider.dart'; // Importer le provider de transaction
+import 'package:student_app/stores/auth_provider.dart'; // Importer le provider d'auth
+import 'package:student_app/stores/recharge_provider.dart'; // Importer le provider de transaction
 
 // 1. Service d'Avatar Simulé (inchangé)
 class AvatarService {
