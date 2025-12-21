@@ -21,7 +21,7 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
       final etudiant = Etudiant.fromJson(jsonMap);
 
       return etudiant;
-    } catch (e, st) {
+    } catch (e) {
       throw Exception('Erreur lors du chargement de l’étudiant: $e');
     }
   }
