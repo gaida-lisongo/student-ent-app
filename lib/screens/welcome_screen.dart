@@ -10,8 +10,7 @@ class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
 
   // URL de simulation fournie
-  static const String simulationUrl =
-      'http://172.20.10.14:3000/api/parcours/6926d4e09c74cc9b8856a323';
+  static const String simulationUrl = '/parcours/6926d4e09c74cc9b8856a323';
 
   // Fonction pour gérer le résultat du scan (ou de la simulation)
   void handleAuthScanResult(
@@ -39,19 +38,20 @@ class WelcomeScreen extends ConsumerWidget {
 
     try {
       // 2. Déclencher la connexion via le Provider
-      // Extraire l'ID d'inscription depuis l'URL
-      final uri = Uri.parse(rawData);
-      final inscriptionId = uri.pathSegments.last;
+      print('Raw data from scan/simulation: $rawData');
 
-      final inscriptionData = await authNotifier.login(inscriptionId);
+      final inscriptionData = await authNotifier.login(rawData);
 
       // 3. Vérifier le résultat SEULEMENT si le widget est toujours monté
       if (!context.mounted) return;
 
       if (inscriptionData['success'] == true &&
           inscriptionData['data'] != null) {
-        // Créer l'objet InscriptionData depuis la réponse
-        final inscription = InscriptionData.fromJson(inscriptionData);
+        // Récupérer les données de l'inscription depuis la réponse
+        final data = inscriptionData['data'] as Map<String, dynamic>;
+
+        // Créer l'objet InscriptionData depuis les données
+        final inscription = InscriptionData.fromJson({'data': data});
 
         final etudiantNotifier = ref.read(etudiantProvider.notifier);
         // Sauvegarder l'étudiant localement
@@ -70,7 +70,7 @@ class WelcomeScreen extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Erreur de connexion: ${inscriptionData['error'] ?? 'Erreur inconnue'}',
+              'Erreur de connexion: ${inscriptionData['message'] ?? 'Erreur inconnue'}',
             ),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),

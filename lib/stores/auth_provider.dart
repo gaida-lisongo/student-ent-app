@@ -20,33 +20,59 @@ class AuthAsyncNotifier extends AsyncNotifier<String?> {
   Future<Map<String, dynamic>> login(String url) async {
     state = const AsyncValue.loading();
     try {
-      final response = await _dio.get(url);
+      print('Attempting to login with URL: $url');
+      final response = await _dio.get(
+        url,
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      print('Login response status: ${response.statusCode}');
+      print('Login response data: ${response.data}');
 
       if (response.statusCode == 200) {
-        final data = response.data as Map<String, dynamic>;
-        final token = '${data['_id'] as String}:${data['statut'] as String}';
+        final responseData = response.data as Map<String, dynamic>;
 
-        // Store the token securely
-        await _storage.write(key: 'auth_token', value: token);
-        await _storage.write(
-          key: 'etudiant',
-          value: jsonEncode(data['etudiantId']),
-        );
-        await _storage.write(key: 'statut', value: data['statut'] as String);
-        await _storage.write(
-          key: 'promotion',
-          value: jsonEncode(data['promotionId']),
-        );
-        await _storage.write(key: 'annee', value: jsonEncode(data['anneeId']));
+        // Vérifier si la réponse a le format {success: true, data: {...}}
+        if (responseData['success'] == true && responseData['data'] != null) {
+          final data = responseData['data'] as Map<String, dynamic>;
+          final token = '${data['_id'] as String}:${data['statut'] as String}';
 
-        // Update state with the token
-        state = AsyncValue.data(token);
+          // Store the token securely
+          await _storage.write(key: 'auth_token', value: token);
+          await _storage.write(
+            key: 'etudiant',
+            value: jsonEncode(data['etudiantId']),
+          );
+          await _storage.write(key: 'statut', value: data['statut'] as String);
+          await _storage.write(
+            key: 'promotion',
+            value: jsonEncode(data['promotionId']),
+          );
+          await _storage.write(
+            key: 'annee',
+            value: jsonEncode(data['anneeId']),
+          );
 
-        return data;
+          // Update state with the token
+          state = AsyncValue.data(token);
+
+          // Retourner la réponse complète pour le welcome_screen
+          return responseData;
+        } else {
+          throw Exception(
+            'Invalid response format: ${responseData['message'] ?? 'Unknown error'}',
+          );
+        }
       } else {
         throw Exception('Failed to login: ${response.statusCode}');
       }
     } catch (e, st) {
+      print('Login error: $e');
       state = AsyncValue.error(e, st);
       rethrow;
     }
