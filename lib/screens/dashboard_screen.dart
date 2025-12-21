@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:student_app/components/custom_button.dart';
 import 'package:student_app/model/annee_model.dart';
 import 'package:student_app/model/promotion_model.dart';
 import 'package:student_app/model/recharge_model.dart';
@@ -74,10 +75,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 (etudiant != null) ? metricCard(etudiant) : Container(),
                 const SizedBox(height: 10),
                 inscriptionStatusCard(),
-                const SizedBox(height: 10),
-                (etudiant != null)
-                    ? balanceCard(etudiant)
-                    : Container(), // WIDGET MAINTENU ET NON CASSÉ
                 const SizedBox(height: 10),
                 // Liste des recharges
                 rechargesList(),
@@ -1013,7 +1010,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  // Widget pour afficher la liste des recharges
+  // Widget pour afficher la liste des recharges avec métriques
   Widget rechargesList() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -1039,25 +1036,71 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 );
               }
 
+              // Calculer les métriques
+              final metrics = _calculateRechargeMetrics(recharges);
+
+              // Prendre seulement les 5 dernières recharges
+              final last5Recharges = recharges.take(5).toList();
+
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Historique des recharges',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  // Métriques des recharges
+                  rechargeMetricsCard(metrics),
+                  const SizedBox(height: 16),
+
+                  // Section avec titre et boutons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Dernières recharges',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => _showSearchModal(recharges),
+                            icon: const Icon(Icons.search),
+                            tooltip: 'Rechercher',
+                          ),
+                          IconButton(
+                            onPressed: _showNewRechargeModal,
+                            icon: const Icon(Icons.add),
+                            tooltip: 'Nouvelle recharge',
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
+
+                  // Liste des 5 dernières recharges
                   ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: recharges.length,
+                    itemCount: last5Recharges.length,
                     separatorBuilder: (context, index) =>
                         const SizedBox(height: 8),
                     itemBuilder: (context, index) {
-                      final recharge = recharges[index];
+                      final recharge = last5Recharges[index];
                       return rechargeCard(recharge);
                     },
                   ),
+
+                  // Bouton voir plus si il y a plus de 5 recharges
+                  if (recharges.length > 5) ...[
+                    const SizedBox(height: 16),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => _showAllRechargesModal(recharges),
+                        child: Text('Voir toutes (${recharges.length})'),
+                      ),
+                    ),
+                  ],
                 ],
               );
             },
@@ -1182,33 +1225,499 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   // // Méthode pour afficher les détails d'une recharge
-  // void _showRechargeDetails(Recharge recharge) {
-  //   showDialog(
-  //     context: context,
-  //     builder: (context) => AlertDialog(
-  //       title: const Text('Détails de la recharge'),
-  //       content: Column(
-  //         mainAxisSize: MainAxisSize.min,
-  //         crossAxisAlignment: CrossAxisAlignment.start,
-  //         children: [
-  //           Text('Montant: ${recharge.amount} ${recharge.currency}'),
-  //           Text('Numéro: ${recharge.orderNumber}'),
-  //           Text('Téléphone: ${recharge.phone}'),
-  //           Text('Statut: ${recharge.status}'),
-  //           Text('Description: ${recharge.description}'),
-  //           if (recharge.createdAt != null)
-  //             Text('Date: ${recharge.createdAt!.toString()}'),
-  //         ],
-  //       ),
-  //       actions: [
-  //         TextButton(
-  //           onPressed: () => Navigator.pop(context),
-  //           child: const Text('Fermer'),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
+  void _showRechargeDetails(Recharge recharge) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Détails de la recharge'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Montant: ${recharge.amount} ${recharge.currency}'),
+            Text('Numéro: ${recharge.orderNumber}'),
+            Text('Téléphone: ${recharge.phone}'),
+            Text('Statut: ${recharge.status}'),
+            Text('Description: ${recharge.description}'),
+            if (recharge.createdAt != null)
+              Text('Date: ${recharge.createdAt!.toString()}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Calculer les métriques des recharges
+  Map<String, dynamic> _calculateRechargeMetrics(List<Recharge> recharges) {
+    int completed = 0;
+    int pending = 0;
+    int failed = 0;
+    double totalCompletedCDF = 0.0;
+    double totalCompletedUSD = 0.0;
+    double totalPendingCDF = 0.0;
+    double totalPendingUSD = 0.0;
+
+    for (final recharge in recharges) {
+      switch (recharge.status) {
+        case 'completed':
+          completed++;
+          if (recharge.currency == 'CDF') {
+            totalCompletedCDF += recharge.amount;
+          } else if (recharge.currency == 'USD') {
+            totalCompletedUSD += recharge.amount;
+          }
+          break;
+        case 'pending':
+          pending++;
+          if (recharge.currency == 'CDF') {
+            totalPendingCDF += recharge.amount;
+          } else if (recharge.currency == 'USD') {
+            totalPendingUSD += recharge.amount;
+          }
+          break;
+        case 'failed':
+          failed++;
+          break;
+      }
+    }
+
+    return {
+      'completed': completed,
+      'pending': pending,
+      'failed': failed,
+      'totalCompletedCDF': totalCompletedCDF,
+      'totalCompletedUSD': totalCompletedUSD,
+      'totalPendingCDF': totalPendingCDF,
+      'totalPendingUSD': totalPendingUSD,
+      'total': recharges.length,
+    };
+  }
+
+  // Widget pour afficher les métriques des recharges
+  Widget rechargeMetricsCard(Map<String, dynamic> metrics) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Métriques des recharges',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              Expanded(
+                child: _buildMetricItem(
+                  'Complétées',
+                  '${metrics['completed']}',
+                  Colors.green,
+                  Icons.check_circle,
+                ),
+              ),
+              Expanded(
+                child: _buildMetricItem(
+                  'En attente',
+                  '${metrics['pending']}',
+                  Colors.orange,
+                  Icons.access_time,
+                ),
+              ),
+              Expanded(
+                child: _buildMetricItem(
+                  'Échouées',
+                  '${metrics['failed']}',
+                  Colors.red,
+                  Icons.error,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Section Complétées
+              if (metrics['totalCompletedCDF'] > 0 ||
+                  metrics['totalCompletedUSD'] > 0)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Total complété :',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (metrics['totalCompletedCDF'] > 0)
+                        Text(
+                          '${metrics['totalCompletedCDF'].toStringAsFixed(0)} CDF',
+                          style: const TextStyle(color: Colors.green),
+                        ),
+                      if (metrics['totalCompletedUSD'] > 0)
+                        Text(
+                          '${metrics['totalCompletedUSD'].toStringAsFixed(2)} USD',
+                          style: const TextStyle(color: Colors.green),
+                        ),
+                    ],
+                  ),
+                )
+              else
+                const Expanded(child: SizedBox()),
+
+              // Section En attente
+              if (metrics['totalPendingCDF'] > 0 ||
+                  metrics['totalPendingUSD'] > 0)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'En attente :',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (metrics['totalPendingCDF'] > 0)
+                        Text(
+                          '${metrics['totalPendingCDF'].toStringAsFixed(0)} CDF',
+                          style: const TextStyle(color: Colors.orange),
+                          textAlign: TextAlign.right,
+                        ),
+                      if (metrics['totalPendingUSD'] > 0)
+                        Text(
+                          '${metrics['totalPendingUSD'].toStringAsFixed(2)} USD',
+                          style: const TextStyle(color: Colors.orange),
+                          textAlign: TextAlign.right,
+                        ),
+                    ],
+                  ),
+                )
+              else
+                const Expanded(child: SizedBox()),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricItem(
+    String title,
+    String value,
+    Color color,
+    IconData icon,
+  ) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 11, color: Colors.grey),
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  // Modal pour nouvelle recharge
+  void _showNewRechargeModal() {
+    final phoneController = TextEditingController();
+    final amountController = TextEditingController();
+    final descriptionController = TextEditingController();
+    String selectedCurrency = 'CDF';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        padding: EdgeInsets.only(
+          top: 20,
+          left: 20,
+          right: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Nouvelle recharge',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: phoneController,
+              decoration: const InputDecoration(
+                labelText: 'Numéro de téléphone',
+                border: OutlineInputBorder(),
+                prefixText: '243',
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: amountController,
+                    decoration: const InputDecoration(
+                      labelText: 'Montant',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: selectedCurrency,
+                    decoration: const InputDecoration(
+                      labelText: 'Devise',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: ['CDF', 'USD'].map((String currency) {
+                      return DropdownMenuItem<String>(
+                        value: currency,
+                        child: Text(currency),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      selectedCurrency = newValue ?? 'CDF';
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                CustomButton(
+                  title: 'Annuler',
+                  icon: Icons.close,
+                  onTap: () => Navigator.pop(context),
+                ),
+                CustomButton(
+                  title: 'Créer',
+                  icon: Icons.add,
+                  isDarkMode: true,
+                  onTap: () async {
+                    if (phoneController.text.isNotEmpty &&
+                        amountController.text.isNotEmpty) {
+                      final rechargeNotifier = ref.read(
+                        rechargeProvider.notifier,
+                      );
+                      final success = await rechargeNotifier.addRecharge(
+                        amount: double.parse(amountController.text),
+                        phone: '243${phoneController.text}',
+                        currency: selectedCurrency,
+                        description: descriptionController.text.isEmpty
+                            ? 'Recharge de compte'
+                            : descriptionController.text,
+                      );
+
+                      if (mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              success
+                                  ? 'Recharge créée avec succès'
+                                  : 'Erreur lors de la création de la recharge',
+                            ),
+                            backgroundColor: success
+                                ? Colors.green
+                                : Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Modal pour recherche de recharges
+  void _showSearchModal(List<Recharge> allRecharges) {
+    final searchController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          List<Recharge> filteredRecharges = allRecharges;
+
+          if (searchController.text.isNotEmpty) {
+            final query = searchController.text.toLowerCase();
+            filteredRecharges = allRecharges.where((recharge) {
+              return recharge.phone.toLowerCase().contains(query) ||
+                  recharge.orderNumber.toLowerCase().contains(query) ||
+                  recharge.description.toLowerCase().contains(query) ||
+                  recharge.status.toLowerCase().contains(query) ||
+                  recharge.amount.toString().contains(query);
+            }).toList();
+          }
+
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.8,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                const Text(
+                  'Rechercher une recharge',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: searchController,
+                  decoration: const InputDecoration(
+                    labelText: 'Rechercher...',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'Téléphone, numéro, statut, montant...',
+                  ),
+                  onChanged: (value) => setState(() {}),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: filteredRecharges.isEmpty
+                      ? const Center(child: Text('Aucune recharge trouvée'))
+                      : ListView.separated(
+                          itemCount: filteredRecharges.length,
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            return rechargeCard(filteredRecharges[index]);
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Modal pour afficher toutes les recharges
+  void _showAllRechargesModal(List<Recharge> allRecharges) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.8,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Toutes les recharges (${allRecharges.length})',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.separated(
+                itemCount: allRecharges.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  return rechargeCard(allRecharges[index]);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // Widget temporaire RechargeCard
