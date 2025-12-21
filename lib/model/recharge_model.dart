@@ -26,14 +26,28 @@ class Recharge {
   });
 
   factory Recharge.fromJson(Map<String, dynamic> json) {
+    // Gérer etudiantId qui peut être un String ou un objet
+    String etudiantIdValue;
+    final etudiantIdRaw = json['etudiantId'];
+    if (etudiantIdRaw is String) {
+      etudiantIdValue = etudiantIdRaw;
+    } else if (etudiantIdRaw is Map<String, dynamic>) {
+      etudiantIdValue = etudiantIdRaw['_id'] as String;
+    } else {
+      throw Exception('Format etudiantId invalide');
+    }
+
     return Recharge(
       id: json['_id'] as String,
-      etudiantId: json['etudiantId'] as String,
+      etudiantId: etudiantIdValue,
       amount: (json['amount'] as num).toDouble(),
       currency: json['currency'] as String? ?? 'XOF',
       phone: json['phone'] as String,
       description: json['description'] as String? ?? '',
-      paymentMethode: json['paymentMethode'] as String,
+      paymentMethode:
+          json['paymentMethod'] as String? ??
+          json['paymentMethode'] as String? ??
+          'mobile_money',
       orderNumber: json['orderNumber'] as String,
       status: json['status'] as String,
       createdAt: json['createdAt'] != null

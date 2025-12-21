@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/model/annee_model.dart';
 import 'package:student_app/model/promotion_model.dart';
+import 'package:student_app/model/recharge_model.dart';
 import 'package:student_app/model/student_model.dart';
 import 'package:student_app/stores/annee_provider.dart';
 import 'package:student_app/stores/auth_provider.dart';
 import 'package:student_app/stores/promotion_provider.dart';
+import 'package:student_app/stores/recharge_provider.dart';
 import 'package:student_app/stores/student_provider.dart';
 // import 'package:student_app/components/button_row.dart';
 // import 'package:student_app/components/transaction_card.dart';
@@ -69,14 +71,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: <Widget>[
                 (etudiant != null) ? userHeader(etudiant) : Container(),
                 const SizedBox(height: 10),
-                metricCard(),
+                (etudiant != null) ? metricCard(etudiant) : Container(),
                 const SizedBox(height: 10),
-                // inscriptionStatusCard(),
+                inscriptionStatusCard(),
                 const SizedBox(height: 10),
-                // balanceCard(), // WIDGET MAINTENU ET NON CASSÉ
+                (etudiant != null)
+                    ? balanceCard(etudiant)
+                    : Container(), // WIDGET MAINTENU ET NON CASSÉ
                 const SizedBox(height: 10),
-                // INTÉGRATION DE LA LISTE DES TRANSACTIONS
-                // transactionsList(),
+                // Liste des recharges
+                rechargesList(),
                 const SizedBox(height: 20), // Espace en bas de la liste
               ],
             ),
@@ -562,179 +566,221 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget metricCard() {
+  Widget metricCard(Etudiant etudiant) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Consumer(
         builder: (context, ref, child) {
-          late final Annee annee;
-          late final Promotion promotion;
-
-          String anneeDesignation = "-";
-          String promotionDesignation = "Promotion";
-          String niveau = "N/A";
-          String cycle = "N/A";
-          int totalSemestres = 0;
-          int totalCredits = 0;
-
           final anneeSync = ref.watch(anneeProvider);
           final promotionSync = ref.watch(promotionProvider);
 
-          anneeSync.whenData((data) {
-            if (data != null) {
-              annee = data;
-            }
-          });
+          return anneeSync.when(
+            data: (annee) => promotionSync.when(
+              data: (promotion) {
+                String anneeDesignation = "-";
+                String promotionDesignation = "Promotion";
+                String niveau = "N/A";
+                String cycle = "N/A";
+                int totalSemestres = 0;
+                int totalCredits = 0;
 
-          promotionSync.whenData((data) {
-            if (data != null) {
-              promotion = data;
-            }
-          });
+                if (annee != null) {
+                  anneeDesignation = "${annee.debut} - ${annee.fin}";
+                }
 
-          anneeDesignation = "${annee.debut} - ${annee.fin}";
-          promotionDesignation = promotion.designation;
-          niveau = promotion.niveau;
-          cycle = promotion.cycle;
-          totalSemestres = promotion.semestres.length;
-          totalCredits = promotion.semestres.fold(
-            0,
-            (sum, semestre) => sum + semestre.credits,
-          );
+                if (promotion != null) {
+                  promotionDesignation = promotion.designation;
+                  niveau = promotion.niveau;
+                  cycle = promotion.cycle;
+                  totalSemestres = promotion.semestres.length;
+                  totalCredits = promotion.semestres.fold(
+                    0,
+                    (sum, semestre) => sum + semestre.credits,
+                  );
+                }
 
-          return Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12.0),
-            ),
-            child: Stack(
-              children: [
-                // 1. Image de fond
-                Positioned.fill(
-                  child: ClipRRect(
+                return Container(
+                  decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12.0),
-                    child: Image.asset(
-                      "assets/images/metric_background.jpg",
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: const Color.fromARGB(255, 4, 84, 221),
-                        );
-                      },
-                    ),
                   ),
-                ),
-                // 2. Calque d'opacité
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12.0),
-                      color: const Color.fromARGB(
-                        255,
-                        1,
-                        7,
-                        10,
-                      ).withOpacity(0.6),
-                    ),
-                  ),
-                ),
-                // 3. Contenu de la carte
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Stack(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Icon(Icons.home, size: 18, color: Colors.white),
-                          Text(
-                            anneeDesignation,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              color: Colors.white70,
-                            ),
+                      // 1. Image de fond
+                      Positioned.fill(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12.0),
+                          child: Image.asset(
+                            "assets/images/metric_background.jpg",
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: const Color.fromARGB(255, 4, 84, 221),
+                              );
+                            },
                           ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Promotion",
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white70,
-                            ),
+                      // 2. Calque d'opacité
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12.0),
+                            color: const Color.fromARGB(
+                              255,
+                              1,
+                              7,
+                              10,
+                            ).withOpacity(0.6),
                           ),
-                          Text(
-                            promotionDesignation,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          Text(
-                            "Niveau: $niveau | Cycle: $cycle",
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                "Semestre",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                              Text(
-                                totalSemestres.toString(),
-                                style: const TextStyle(
-                                  fontSize: 14,
+                      // 3. Contenu de la carte
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Icon(
+                                  Icons.home,
+                                  size: 18,
                                   color: Colors.white,
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 40),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                "Crédits",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white70,
+                                Text(
+                                  anneeDesignation,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    color: Colors.white70,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                totalCredits.toString(),
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.white,
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Promotion $promotionDesignation",
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white70,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+                                Text(
+                                  "${etudiant.solde} FC",
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  "Système : ${promotion?.systeme} | Cycle: $cycle",
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "Semestre",
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                    Text(
+                                      totalSemestres.toString(),
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 40),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "Crédits",
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                    Text(
+                                      totalCredits.toString(),
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
+                );
+              },
+              loading: () => Container(
+                height: 120,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12.0),
+                  color: Colors.grey[300],
                 ),
-              ],
+                child: const Center(child: CircularProgressIndicator()),
+              ),
+              error: (error, stackTrace) => Container(
+                height: 120,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12.0),
+                  color: Colors.red[100],
+                ),
+                child: const Center(
+                  child: Text(
+                    'Erreur de chargement des promotions',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ),
+            ),
+            loading: () => Container(
+              height: 120,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12.0),
+                color: Colors.grey[300],
+              ),
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+            error: (error, stackTrace) => Container(
+              height: 120,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12.0),
+                color: Colors.red[100],
+              ),
+              child: const Center(
+                child: Text(
+                  'Erreur de chargement des années',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
             ),
           );
         },
@@ -743,137 +789,397 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   // inscriptionStatusCard : Affiche le statut d'inscription
-  // Widget inscriptionStatusCard() {
-  //   return Padding(
-  //     padding: const EdgeInsets.symmetric(horizontal: 16.0),
-  //     child: Consumer(
-  //       builder: (context, ref, child) {
-  //         final authNotifier = ref.read(authProvider.notifier);
-  //         final statut = authNotifier.status ?? "Non disponible";
+  Widget inscriptionStatusCard() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Consumer(
+        builder: (context, ref, child) {
+          final authAsync = ref.watch(authProvider);
 
-  //         // Couleur basée sur le statut
-  //         Color statusColor = Colors.grey;
-  //         if (statut.toLowerCase() == 'actif' ||
-  //             statut.toLowerCase() == 'inscrit') {
-  //           statusColor = Colors.green;
-  //         } else if (statut.toLowerCase() == 'en attente') {
-  //           statusColor = Colors.orange;
-  //         }
+          return authAsync.when(
+            data: (token) {
+              String statut = "Non disponible";
 
-  //         return Container(
-  //           padding: const EdgeInsets.all(16.0),
-  //           decoration: BoxDecoration(
-  //             border: Border.all(color: statusColor.withOpacity(0.3), width: 1),
-  //             borderRadius: BorderRadius.circular(12.0),
-  //             color: statusColor.withOpacity(0.05),
-  //           ),
-  //           child: Row(
-  //             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  //             children: [
-  //               Column(
-  //                 crossAxisAlignment: CrossAxisAlignment.start,
-  //                 children: [
-  //                   const Text(
-  //                     'Statut d\'Inscription',
-  //                     style: TextStyle(
-  //                       fontSize: 12,
-  //                       color: Colors.grey,
-  //                       fontWeight: FontWeight.w500,
-  //                     ),
-  //                   ),
-  //                   const SizedBox(height: 8.0),
-  //                   Text(
-  //                     statut,
-  //                     style: TextStyle(
-  //                       fontSize: 16,
-  //                       fontWeight: FontWeight.bold,
-  //                       color: statusColor,
-  //                     ),
-  //                   ),
-  //                 ],
-  //               ),
-  //               Container(
-  //                 padding: const EdgeInsets.all(12.0),
-  //                 decoration: BoxDecoration(
-  //                   shape: BoxShape.circle,
-  //                   color: statusColor.withOpacity(0.1),
-  //                 ),
-  //                 child: Icon(
-  //                   Icons.check_circle_outline,
-  //                   color: statusColor,
-  //                   size: 24,
-  //                 ),
-  //               ),
-  //             ],
-  //           ),
-  //         );
-  //       },
-  //     ),
-  //   );
-  // }
+              if (token != null && token.contains(':')) {
+                // Extraire le statut depuis le token (format: "id:statut")
+                statut = token.split(':')[1];
+              }
+
+              // Couleur basée sur le statut
+              Color statusColor = Colors.grey;
+              if (statut.toLowerCase() == 'actif' ||
+                  statut.toLowerCase() == 'inscrit') {
+                statusColor = Colors.green;
+              } else if (statut.toLowerCase() == 'en attente') {
+                statusColor = Colors.orange;
+              }
+
+              return Container(
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: statusColor.withOpacity(0.3),
+                    width: 1,
+                  ),
+                  borderRadius: BorderRadius.circular(12.0),
+                  color: statusColor.withOpacity(0.05),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Statut d\'Inscription',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8.0),
+                        Text(
+                          statut,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(12.0),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: statusColor.withOpacity(0.1),
+                      ),
+                      child: Icon(
+                        Icons.check_circle_outline,
+                        color: statusColor,
+                        size: 24,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+            loading: () => Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Colors.grey.withOpacity(0.3),
+                  width: 1,
+                ),
+                borderRadius: BorderRadius.circular(12.0),
+                color: Colors.grey.withOpacity(0.05),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Statut d\'Inscription',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: 8.0),
+                      CircularProgressIndicator(strokeWidth: 2),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            error: (error, stack) => Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Colors.red.withOpacity(0.3),
+                  width: 1,
+                ),
+                borderRadius: BorderRadius.circular(12.0),
+                color: Colors.red.withOpacity(0.05),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Statut d\'Inscription',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: 8.0),
+                      Text(
+                        'Erreur',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   // balanceCard : REVENU À SA VERSION ORIGINALE (AVEC BUTTON_ROW)
-  // Widget balanceCard() {
-  //   return Consumer(
-  //     builder: (context, ref, child) {
-  //       final etudiantAsync = ref.watch(etudiantProvider);
+  Widget balanceCard(Etudiant etudiant) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final rechargeSync = ref.watch(rechargeProvider);
 
-  //       return etudiantAsync.when(
-  //         data: (etudiant) {
-  //           final soldeValue = etudiant?.solde ?? 0;
+        return rechargeSync.when(
+          data: (recharges) {
+            double totalBalance = recharges
+                .where((r) => r.status == 'completed')
+                .fold(0.0, (sum, r) => sum + r.amount);
 
-  //           return Padding(
-  //             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-  //             child: Column(
-  //               crossAxisAlignment: CrossAxisAlignment.start,
-  //               children: [
-  //                 const Text(
-  //                   "Balance solde",
-  //                   style: TextStyle(fontSize: 14, color: Colors.black87),
-  //                 ),
-  //                 const SizedBox(height: 8.0),
-  //                 Text(
-  //                   "$soldeValue FC",
-  //                   style: const TextStyle(
-  //                     fontSize: 24,
-  //                     fontWeight: FontWeight.bold,
-  //                     color: Colors.black,
-  //                   ),
-  //                 ),
-  //                 const SizedBox(height: 16.0),
-  //                 ButtonRow(
-  //                   leftButtonTitle: "Recharger",
-  //                   leftButtonIcon: Icons.add,
-  //                   leftButtonOnTap: () {
-  //                     showModalBottomSheet(
-  //                       context: context,
-  //                       isScrollControlled: true,
-  //                       shape: const RoundedRectangleBorder(
-  //                         borderRadius: BorderRadius.vertical(
-  //                           top: Radius.circular(20),
-  //                         ),
-  //                       ),
-  //                       builder: (context) => const RechargeBottomSheet(),
-  //                     );
-  //                   },
-  //                   rightButtonTitle: "Historique",
-  //                   rightButtonIcon: Icons.history,
-  //                   rightButtonOnTap: () {
-  //                     print('Historique tapped');
-  //                     ScaffoldMessenger.of(context).showSnackBar(
-  //                       const SnackBar(
-  //                         content: Text('Historique des transactions'),
-  //                   ),
-  //                 );
-  //               },
-  //               isDarkMode: true,
-  //             ),
-  //           ],
-  //         ),
-  //       );
-  //     },
-  //   );
-  // }
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Container(
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: Colors.blueAccent,
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Solde Disponible',
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8.0),
+                    Text(
+                      '${totalBalance.toStringAsFixed(2)} USD',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16.0),
+                    // Boutons d'action
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            // Action pour recharger le solde
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                          ),
+                          child: const Text(
+                            'Recharger',
+                            style: TextStyle(color: Colors.blueAccent),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stackTrace) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              'Erreur de chargement du solde: $error',
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Widget pour afficher la liste des recharges
+  Widget rechargesList() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Consumer(
+        builder: (context, ref, child) {
+          final rechargeAsync = ref.watch(rechargeProvider);
+
+          return rechargeAsync.when(
+            data: (recharges) {
+              if (recharges.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Aucune recharge trouvée',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ),
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Historique des recharges',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: recharges.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final recharge = recharges[index];
+                      return rechargeCard(recharge);
+                    },
+                  ),
+                ],
+              );
+            },
+            loading: () => Container(
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+            error: (error, stackTrace) => Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.red[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(
+                  'Erreur de chargement des recharges: $error',
+                  style: const TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Widget pour afficher une carte de recharge individuelle
+  Widget rechargeCard(Recharge recharge) {
+    Color statusColor;
+    IconData statusIcon;
+
+    switch (recharge.status) {
+      case 'completed':
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle;
+        break;
+      case 'pending':
+        statusColor = Colors.orange;
+        statusIcon = Icons.access_time;
+        break;
+      case 'failed':
+        statusColor = Colors.red;
+        statusIcon = Icons.error;
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusIcon = Icons.help;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${recharge.amount.toStringAsFixed(2)} ${recharge.currency}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Row(
+                children: [
+                  Icon(statusIcon, color: statusColor, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    recharge.status.toUpperCase(),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            recharge.description,
+            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Tel: ${recharge.phone}',
+                style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              ),
+              if (recharge.createdAt != null)
+                Text(
+                  '${recharge.createdAt!.day}/${recharge.createdAt!.month}/${recharge.createdAt!.year}',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   // // Méthode pour afficher les détails d'une recharge
   // void _showRechargeDetails(Recharge recharge) {

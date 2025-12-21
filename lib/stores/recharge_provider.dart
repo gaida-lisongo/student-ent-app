@@ -12,16 +12,15 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
   @override
   Future<List<Recharge>> build() async {
     _dio = ref.read(dioProvider);
+
     final etudiantState = ref.watch(etudiantProvider);
 
-    return etudiantState.when(
-      data: (etudiant) async {
-        if (etudiant == null) return [];
-        return _fetchRecharges(etudiant.id);
-      },
-      loading: () => [],
-      error: (_, __) => [],
-    );
+    // Éviter les appels multiples en attendant directement l'AsyncValue
+    if (etudiantState.hasValue && etudiantState.value != null) {
+      return _fetchRecharges(etudiantState.value!.id);
+    }
+
+    return [];
   }
 
   Future<List<Recharge>> _fetchRecharges(String etudiantId) async {
@@ -31,19 +30,16 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
       );
 
       if (response.statusCode == 200) {
-        final responseData = response.data;
-
-        // Gérer différents formats de réponse
-        List<dynamic> data;
-        if (responseData is Map<String, dynamic>) {
-          // Si la réponse est dans un format { "data": [...] }
-          data = responseData['data'] as List<dynamic>? ?? [];
-        } else if (responseData is List<dynamic>) {
-          // Si la réponse est directement une liste
-          data = responseData;
+        final responseData = response.data as Map<String, dynamic>;
+        late final List<dynamic> data;
+        if (responseData['success'] == true && responseData['data'] != null) {
+          // Si la réponse est dans un format { "success": true, "data": [...] }
+          data = responseData['data'] as List<dynamic>;
         } else {
           throw Exception('Format de réponse inattendu');
         }
+
+        print('Recharges récupérées: $data');
 
         final sortedRecharges =
             data
@@ -64,6 +60,27 @@ class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {
     } catch (e) {
       throw Exception('Erreur lors du chargement des recharges: $e');
     }
+  }
+
+  // Méthode publique pour refetch les recharges
+  Future<void> refetchRecharges() async {
+    final etudiantState = ref.read(etudiantProvider);
+
+    await etudiantState.when(
+      data: (etudiant) async {
+        if (etudiant != null) {
+          state = const AsyncValue.loading();
+          try {
+            final recharges = await _fetchRecharges(etudiant.id);
+            state = AsyncValue.data(recharges);
+          } catch (e, st) {
+            state = AsyncValue.error(e, st);
+          }
+        }
+      },
+      loading: () async {},
+      error: (_, __) async {},
+    );
   }
 
   Future<Recharge> _createRecharge({
