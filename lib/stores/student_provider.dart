@@ -34,7 +34,6 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
     try {
       final jsonString = jsonEncode(etudiant.toJson());
       await _storage.write(key: 'etudiant', value: jsonString);
-      print("Étudiant sauvegardé: ${etudiant.nom} ${etudiant.prenom}");
 
       // Important : créer un nouvel AsyncValue pour forcer la notification
       // Utiliser AsyncValue.guard ou créer explicitement un nouveau AsyncValue
@@ -44,12 +43,7 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
         Duration.zero,
       ); // Petit délai pour forcer le changement
       state = AsyncValue.data(etudiant);
-
-      print(
-        "État mis à jour - Previous: ${previousState.value?.nom}, New: ${etudiant.nom}",
-      );
     } catch (e, st) {
-      print('Erreur setEtudiant: $e');
       // En cas d'erreur, garder l'état actuel plutôt que de tout casser
       if (!state.hasValue) {
         state = AsyncValue.error(e, st);
@@ -69,8 +63,6 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
 
     // Ne pas mettre en loading pour éviter que l'UI disparaisse
     try {
-      print('Mise à jour du profil avec: $profileData');
-
       final response = await _dio.put(
         '/etudiant/${currentEtudiant!.id}/profile',
         data: profileData,
@@ -82,30 +74,20 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
         ),
       );
 
-      print('Réponse serveur: ${response.statusCode}');
-      print('Données réponse: ${response.data}');
-
       if (response.statusCode == 200 && response.data != null) {
         final result = response.data as Map<String, dynamic>;
 
         if (result['success'] == true && result['etudiant'] != null) {
           // Créer l'étudiant mis à jour
           final etudiantData = result['etudiant'] as Map<String, dynamic>;
-          print('Données étudiant reçues: $etudiantData');
 
           try {
             final updatedEtudiant = Etudiant.fromJson(etudiantData);
-            print(
-              'Étudiant créé: ${updatedEtudiant.nom} ${updatedEtudiant.prenom}',
-            );
 
             await setEtudiant(updatedEtudiant);
-            print('Étudiant sauvegardé avec succès');
 
             return true;
           } catch (parseError, parseStack) {
-            print('Erreur parsing étudiant: $parseError');
-            print('Stack: $parseStack');
             // Ne pas mettre l'état en erreur, garder l'état actuel
             return false;
           }
@@ -114,18 +96,14 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
               result['error'] ??
               result['message'] ??
               'Erreur lors de la mise à jour du profil';
-          print('Erreur retournée par le serveur: $errorMsg');
           // Ne pas mettre l'état en erreur, juste retourner false
           return false;
         }
       } else {
-        print('Code de statut non-200: ${response.statusCode}');
         // Ne pas mettre l'état en erreur, juste retourner false
         return false;
       }
     } catch (e, st) {
-      print('Erreur updateProfile: $e');
-      print('Stack trace: $st');
       // Ne pas mettre l'état en erreur pour éviter de casser l'UI
       return false;
     }

@@ -1,4 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:student_app/model/annee_model.dart';
+import 'package:student_app/model/promotion_model.dart';
+import 'package:student_app/model/semestre_model.dart';
+import 'package:student_app/model/student_model.dart';
+import 'package:student_app/model/matiere_model.dart';
+import 'package:student_app/model/promotion_model.dart';
+import 'package:student_app/model/semestre_model.dart';
+import 'package:student_app/model/unite_model.dart';
+import 'package:student_app/stores/annee_provider.dart';
+import 'package:student_app/stores/promotion_provider.dart';
+import 'package:student_app/stores/student_provider.dart';
+import 'package:student_app/screens/matiere_screen.dart';
 
 // Modèle de Produit pour la commande de bulletins
 class BulletinProduct {
@@ -34,44 +47,32 @@ class OrderedBulletin {
   });
 }
 
-class ResultatScreen extends StatefulWidget {
+class ResultatScreen extends ConsumerStatefulWidget {
   const ResultatScreen({super.key});
 
   @override
-  State<ResultatScreen> createState() => _ResultatScreenState();
+  ConsumerState<ResultatScreen> createState() => _ResultatScreenState();
 }
 
-class _ResultatScreenState extends State<ResultatScreen> {
-  // Mock Data pour les produits disponibles (Section 1)
-  final List<BulletinProduct> _products = [
-    BulletinProduct(
-      id: '1',
-      designation: 'Résultat Annuel',
-      description:
-          'Bulletin pour l\'année académique complète, indispensable pour la transition.',
-      montant: 5000,
-      credit: 60,
-      anneeAcad: '2024-2025',
-    ),
-    BulletinProduct(
-      id: '2',
-      designation: 'Résultat Semestre 1',
-      description:
-          'Consultation détaillée de toutes les notes et crédits du premier semestre.',
-      montant: 2500,
-      credit: 30,
-      anneeAcad: '2024-2025',
-    ),
-    BulletinProduct(
-      id: '3',
-      designation: 'Résultat Semestre 2',
-      description:
-          'Consultation détaillée de toutes les notes et crédits du second semestre.',
-      montant: 2500,
-      credit: 30,
-      anneeAcad: '2024-2025',
-    ),
-  ];
+class _ResultatScreenState extends ConsumerState<ResultatScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  late Etudiant _currentEtudiant;
+  late Promotion _currentPromotion;
+  late Annee _currentAnnee;
 
   // Mock Data pour l'historique des commandes (Section 2)
   final List<OrderedBulletin> _history = [
@@ -118,6 +119,218 @@ class _ResultatScreenState extends State<ResultatScreen> {
   }
 
   // --- WIDGETS DE COMPOSANTS ---
+
+  void _showMatieresModal(UniteEnseignement ue, Semestre s) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Matières - ${ue.designation}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Code: ${ue.code} | Crédits: ${ue.credits}',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 20),
+              if (ue.matieres.isEmpty)
+                const Center(child: Text('Aucune matière associée.'))
+              else
+                ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: ue.matieres.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    final matiere = ue.matieres[index];
+                    return ListTile(
+                      title: Text(matiere.designation),
+                      subtitle: Text(
+                        'Code: ${matiere.code} | Crédits: ${matiere.credits}',
+                      ),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MatiereScreen(
+                              matiere: matiere,
+                              unite: ue,
+                              semestre: s,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSemestresCard(List<Semestre> semestres) {
+    if (semestres.isEmpty) {
+      return const Center(child: Text('Aucun semestre disponible.'));
+    }
+
+    // Mettre à jour le contrôleur si le nombre de semestres change
+    if (_tabController.length != semestres.length) {
+      _tabController = TabController(length: semestres.length, vsync: this);
+    }
+
+    return Column(
+      children: [
+        TabBar(
+          controller: _tabController,
+          labelColor: Colors.indigo,
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: Colors.indigo,
+          tabs: semestres.map((semestre) {
+            return Tab(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(semestre.designation),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.indigo.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${semestre.credits}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.indigo,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: semestres.map((semestre) {
+              if (semestre.unites.isEmpty) {
+                return const Center(
+                  child: Text('Aucune unité d\'enseignement.'),
+                );
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.all(15),
+                itemCount: semestre.unites.length,
+                itemBuilder: (context, index) {
+                  final ue = semestre.unites[index];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 15),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(15),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  ue.designation,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '${ue.credits} Crédits',
+                                  style: const TextStyle(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Code: ${ue.code}',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Total Matières: ${ue.matieres.length}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.grey[800],
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 15),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showMatieresModal(ue, semestre),
+                              icon: const Icon(Icons.list, size: 18),
+                              label: const Text('Voir les matières'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.indigo,
+                                side: const BorderSide(color: Colors.indigo),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
 
   String _getCardImagePath(int index) {
     final int imageNumber = (index % 3) + 1;
@@ -382,26 +595,100 @@ class _ResultatScreenState extends State<ResultatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final etudiantState = ref.watch(etudiantProvider);
+    final promotionState = ref.watch(promotionProvider);
+    final anneeState = ref.watch(anneeProvider);
+
+    etudiantState.whenData((etudiant) {
+      if (etudiant != null) {
+        _currentEtudiant = etudiant;
+      }
+    });
+
+    promotionState.whenData((promotion) {
+      if (promotion != null) {
+        _currentPromotion = promotion;
+      }
+    });
+
+    anneeState.whenData((annee) {
+      if (annee != null) {
+        _currentAnnee = annee;
+      }
+    });
+
+    if (!_currentEtudiant.id.isNotEmpty ||
+        !_currentPromotion.id.isNotEmpty ||
+        !_currentAnnee.id.isNotEmpty) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final String anneeAcad = '${_currentAnnee.debut}/${_currentAnnee.fin}';
+    // Produits dynamiques basés sur l'année
+    final products = [
+      BulletinProduct(
+        id: '1',
+        designation: 'Résultat Annuel',
+        description: 'Bulletin pour l\'année académique complète.',
+        montant: 5000,
+        credit: 60,
+        anneeAcad: anneeAcad,
+      ),
+      BulletinProduct(
+        id: '2',
+        designation: 'Résultat Semestre 1',
+        description: 'Notes et crédits du premier semestre.',
+        montant: 2500,
+        credit: 30,
+        anneeAcad: anneeAcad,
+      ),
+      BulletinProduct(
+        id: '3',
+        designation: 'Résultat Semestre 2',
+        description: 'Notes et crédits du second semestre.',
+        montant: 2500,
+        credit: 30,
+        anneeAcad: anneeAcad,
+      ),
+    ];
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. En-tête du titre
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
-              child: Text(
-                'Mes Résultats',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
+            // 1. En-tête
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Mes Résultats',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  if (_currentPromotion.id.isNotEmpty)
+                    Text(
+                      'Promotion: ${_currentPromotion.designation}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  Text(
+                    'Année: $anneeAcad',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                  ),
+                ],
               ),
             ),
 
-            // 2. Section de Commande des Bulletins (Horizontal ListView)
+            // 2. Section de Commande
             const Padding(
               padding: EdgeInsets.only(left: 20, bottom: 15),
               child: Text(
@@ -414,19 +701,19 @@ class _ResultatScreenState extends State<ResultatScreen> {
               ),
             ),
             SizedBox(
-              height: 190, // Augmenté pour accueillir la description
+              height: 190,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _products.length,
+                itemCount: products.length,
                 itemBuilder: (context, index) {
-                  return _buildOrderCard(_products[index], index);
+                  return _buildOrderCard(products[index], index);
                 },
               ),
             ),
             const SizedBox(height: 25),
 
-            // 3. Section d'Historique des Bulletins (avec bord arrondi)
+            // 3. Historique (Remplacé par les Semestres)
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -450,7 +737,7 @@ class _ResultatScreenState extends State<ResultatScreen> {
                     const Padding(
                       padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
                       child: Text(
-                        'Historique des commandes (PDF)',
+                        'Programme Académique',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -458,15 +745,9 @@ class _ResultatScreenState extends State<ResultatScreen> {
                         ),
                       ),
                     ),
-                    // Liste des bulletins commandés (Vertical ListView)
+                    // Liste des Semestres avec Tabs
                     Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 15),
-                        itemCount: _history.length,
-                        itemBuilder: (context, index) {
-                          return _buildHistoryCard(_history[index]);
-                        },
-                      ),
+                      child: _buildSemestresCard(_currentPromotion.semestres),
                     ),
                   ],
                 ),

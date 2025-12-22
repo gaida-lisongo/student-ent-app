@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/screens/profile_screen.dart';
-// import 'package:student_app/screens/resultat_screen.dart';
+import 'package:student_app/screens/resultat_screen.dart';
 import 'package:student_app/screens/welcome_screen.dart'; // Écran de Bienvenue
 import 'package:student_app/stores/auth_provider.dart';
 import 'package:student_app/screens/dashboard_screen.dart'; // Créer cette page
@@ -189,7 +189,7 @@ class _MyHomePageState extends State<MyHomePage> {
             children: const [
               ProfileScreen(),
               DashboardScreen(),
-              // ResultatScreen(),
+              ResultatScreen(),
             ],
           ),
 
