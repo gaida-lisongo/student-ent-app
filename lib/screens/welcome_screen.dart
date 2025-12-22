@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/components/custom_button.dart';
 import 'package:student_app/stores/auth_provider.dart';
 import 'package:student_app/stores/student_provider.dart';
+import 'package:student_app/stores/annee_provider.dart';
 import 'package:student_app/model/inscription_model.dart';
 
 // Le WelcomeScreen doit être un ConsumerWidget pour interagir avec Riverpod
@@ -56,6 +57,9 @@ class WelcomeScreen extends ConsumerWidget {
         final etudiantNotifier = ref.read(etudiantProvider.notifier);
         // Sauvegarder l'étudiant localement
         await etudiantNotifier.setEtudiant(inscription.etudiant);
+
+        // Invalider les providers pour qu'ils se rechargent
+        ref.invalidate(anneeProvider);
 
         // Succès
         ScaffoldMessenger.of(context).showSnackBar(

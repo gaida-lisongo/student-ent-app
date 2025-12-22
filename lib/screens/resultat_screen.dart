@@ -70,9 +70,8 @@ class _ResultatScreenState extends ConsumerState<ResultatScreen>
     super.dispose();
   }
 
-  late Etudiant _currentEtudiant;
-  late Promotion _currentPromotion;
-  late Annee _currentAnnee;
+  // Variables supprimées pour éviter LateInitializationError
+  // Les données seront gérées directement via les providers async
 
   // Mock Data pour l'historique des commandes (Section 2)
   final List<OrderedBulletin> _history = [
@@ -599,30 +598,41 @@ class _ResultatScreenState extends ConsumerState<ResultatScreen>
     final promotionState = ref.watch(promotionProvider);
     final anneeState = ref.watch(anneeProvider);
 
-    etudiantState.whenData((etudiant) {
-      if (etudiant != null) {
-        _currentEtudiant = etudiant;
-      }
-    });
+    // Vérifier que toutes les données sont disponibles
+    return etudiantState.when(
+      data: (etudiant) => promotionState.when(
+        data: (promotion) => anneeState.when(
+          data: (annee) {
+            if (etudiant == null || promotion == null || annee == null) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            return _buildMainContent(etudiant, promotion, annee);
+          },
+          loading: () =>
+              const Scaffold(body: Center(child: CircularProgressIndicator())),
+          error: (error, stack) =>
+              Scaffold(body: Center(child: Text('Erreur: $error'))),
+        ),
+        loading: () =>
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        error: (error, stack) =>
+            Scaffold(body: Center(child: Text('Erreur: $error'))),
+      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, stack) =>
+          Scaffold(body: Center(child: Text('Erreur: $error'))),
+    );
+  }
 
-    promotionState.whenData((promotion) {
-      if (promotion != null) {
-        _currentPromotion = promotion;
-      }
-    });
-
-    anneeState.whenData((annee) {
-      if (annee != null) {
-        _currentAnnee = annee;
-      }
-    });
-
-    if (!_currentEtudiant.id.isNotEmpty ||
-        !_currentPromotion.id.isNotEmpty ||
-        !_currentAnnee.id.isNotEmpty) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    final String anneeAcad = '${_currentAnnee.debut}/${_currentAnnee.fin}';
+  Widget _buildMainContent(
+    Etudiant etudiant,
+    Promotion promotion,
+    Annee annee,
+  ) {
+    final String anneeAcad = '${annee.debut}/${annee.fin}';
     // Produits dynamiques basés sur l'année
     final products = [
       BulletinProduct(
@@ -671,9 +681,9 @@ class _ResultatScreenState extends ConsumerState<ResultatScreen>
                       color: Colors.black,
                     ),
                   ),
-                  if (_currentPromotion.id.isNotEmpty)
+                  if (promotion.id.isNotEmpty)
                     Text(
-                      'Promotion: ${_currentPromotion.designation}',
+                      'Promotion: ${promotion.designation}',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.grey[600],
@@ -746,9 +756,7 @@ class _ResultatScreenState extends ConsumerState<ResultatScreen>
                       ),
                     ),
                     // Liste des Semestres avec Tabs
-                    Expanded(
-                      child: _buildSemestresCard(_currentPromotion.semestres),
-                    ),
+                    Expanded(child: _buildSemestresCard(promotion.semestres)),
                   ],
                 ),
               ),
@@ -757,5 +765,62 @@ class _ResultatScreenState extends ConsumerState<ResultatScreen>
         ),
       ),
     );
+  }
+
+  // Méthode helper pour construire les cards de produit avec les bonnes données
+  Widget _buildProductCard(BulletinProduct product, Etudiant etudiant) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              product.designation,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(product.description),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${product.montant} FCFA',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+                Text('Crédits: ${product.credit}'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text('Année: ${product.anneeAcad}'),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _handleOrder(product, etudiant),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text('Commander - ${product.montant} FCFA'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleOrder(BulletinProduct product, Etudiant etudiant) {
+    // Logique de commande ici
+    print('Commande pour ${product.designation} par ${etudiant.nom}');
   }
 }
