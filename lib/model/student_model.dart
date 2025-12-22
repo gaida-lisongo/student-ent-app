@@ -10,6 +10,9 @@ class Etudiant {
   final String? lieuNaissance;
   final String? nationalite;
   final String? photo;
+  final String? telephone;
+  final String? email;
+  final String? adresse;
   final double solde;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -26,6 +29,9 @@ class Etudiant {
     this.lieuNaissance,
     this.nationalite,
     this.photo,
+    this.telephone,
+    this.email,
+    this.adresse,
     this.createdAt,
     this.updatedAt,
   });
@@ -45,6 +51,11 @@ class Etudiant {
       lieuNaissance: json['lieu_naissance'] as String?,
       nationalite: json['nationalite'] as String?,
       photo: json['photo'] as String?,
+      telephone:
+          json['telephone'] as String?, // Peut être null si pas dans la réponse
+      email: json['email'] as String?, // Peut être null si pas dans la réponse
+      adresse:
+          json['adresse'] as String?, // Peut être null si pas dans la réponse
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : null,
@@ -66,6 +77,9 @@ class Etudiant {
       'lieu_naissance': lieuNaissance,
       'nationalite': nationalite,
       'photo': photo,
+      'telephone': telephone,
+      'email': email,
+      'adresse': adresse,
       'solde': solde,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
@@ -83,6 +97,9 @@ class Etudiant {
     String? lieuNaissance,
     String? nationalite,
     String? photo,
+    String? telephone,
+    String? email,
+    String? adresse,
     double? solde,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -98,6 +115,9 @@ class Etudiant {
       lieuNaissance: lieuNaissance ?? this.lieuNaissance,
       nationalite: nationalite ?? this.nationalite,
       photo: photo ?? this.photo,
+      telephone: telephone ?? this.telephone,
+      email: email ?? this.email,
+      adresse: adresse ?? this.adresse,
       solde: solde ?? this.solde,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -118,6 +138,9 @@ class Etudiant {
         other.lieuNaissance == lieuNaissance &&
         other.nationalite == nationalite &&
         other.photo == photo &&
+        other.telephone == telephone &&
+        other.email == email &&
+        other.adresse == adresse &&
         other.solde == solde &&
         other.createdAt == createdAt &&
         other.updatedAt == updatedAt;
@@ -136,6 +159,9 @@ class Etudiant {
       lieuNaissance,
       nationalite,
       photo,
+      telephone,
+      email,
+      adresse,
       solde,
       createdAt,
       updatedAt,
@@ -144,7 +170,7 @@ class Etudiant {
 
   @override
   String toString() {
-    return 'Etudiant(id: $id, nom: $nom, postNom: $postNom, prenom: $prenom, matricule: $matricule, sexe: $sexe, dateNaissance: $dateNaissance, lieuNaissance: $lieuNaissance, nationalite: $nationalite, photo: $photo, solde: $solde, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'Etudiant(id: $id, nom: $nom, postNom: $postNom, prenom: $prenom, matricule: $matricule, sexe: $sexe, dateNaissance: $dateNaissance, lieuNaissance: $lieuNaissance, nationalite: $nationalite, photo: $photo, telephone: $telephone, email: $email, adresse: $adresse, solde: $solde, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   // Getter pour l'ID conforme au pattern existant

@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:student_app/model/student_model.dart';
@@ -27,14 +30,30 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
   }
 
   Future<void> setEtudiant(Etudiant etudiant) async {
-    state = const AsyncValue.loading();
+    // Ne pas mettre en loading pour les mises à jour, seulement sauvegarder
     try {
       final jsonString = jsonEncode(etudiant.toJson());
       await _storage.write(key: 'etudiant', value: jsonString);
-      print("New Etudiant Stored: $jsonString");
+      print("Étudiant sauvegardé: ${etudiant.nom} ${etudiant.prenom}");
+
+      // Important : créer un nouvel AsyncValue pour forcer la notification
+      // Utiliser AsyncValue.guard ou créer explicitement un nouveau AsyncValue
+      final previousState = state;
+      state = const AsyncValue.loading();
+      await Future.delayed(
+        Duration.zero,
+      ); // Petit délai pour forcer le changement
       state = AsyncValue.data(etudiant);
+
+      print(
+        "État mis à jour - Previous: ${previousState.value?.nom}, New: ${etudiant.nom}",
+      );
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      print('Erreur setEtudiant: $e');
+      // En cas d'erreur, garder l'état actuel plutôt que de tout casser
+      if (!state.hasValue) {
+        state = AsyncValue.error(e, st);
+      }
       throw Exception('Erreur lors de la sauvegarde de l\'étudiant: $e');
     }
   }
@@ -48,9 +67,10 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
       return false;
     }
 
-    state = const AsyncValue.loading();
-
+    // Ne pas mettre en loading pour éviter que l'UI disparaisse
     try {
+      print('Mise à jour du profil avec: $profileData');
+
       final response = await _dio.put(
         '/etudiant/${currentEtudiant!.id}/profile',
         data: profileData,
@@ -62,33 +82,51 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
         ),
       );
 
+      print('Réponse serveur: ${response.statusCode}');
+      print('Données réponse: ${response.data}');
+
       if (response.statusCode == 200 && response.data != null) {
         final result = response.data as Map<String, dynamic>;
 
         if (result['success'] == true && result['etudiant'] != null) {
           // Créer l'étudiant mis à jour
-          final updatedEtudiant = Etudiant.fromJson(
-            result['etudiant'] as Map<String, dynamic>,
-          );
+          final etudiantData = result['etudiant'] as Map<String, dynamic>;
+          print('Données étudiant reçues: $etudiantData');
 
-          await setEtudiant(updatedEtudiant);
+          try {
+            final updatedEtudiant = Etudiant.fromJson(etudiantData);
+            print(
+              'Étudiant créé: ${updatedEtudiant.nom} ${updatedEtudiant.prenom}',
+            );
 
-          return true;
+            await setEtudiant(updatedEtudiant);
+            print('Étudiant sauvegardé avec succès');
+
+            return true;
+          } catch (parseError, parseStack) {
+            print('Erreur parsing étudiant: $parseError');
+            print('Stack: $parseStack');
+            // Ne pas mettre l'état en erreur, garder l'état actuel
+            return false;
+          }
         } else {
           final errorMsg =
-              result['error'] ?? 'Erreur lors de la mise à jour du profil';
-          state = AsyncValue.error(errorMsg, StackTrace.current);
+              result['error'] ??
+              result['message'] ??
+              'Erreur lors de la mise à jour du profil';
+          print('Erreur retournée par le serveur: $errorMsg');
+          // Ne pas mettre l'état en erreur, juste retourner false
           return false;
         }
       } else {
-        state = AsyncValue.error(
-          'Réponse invalide du serveur',
-          StackTrace.current,
-        );
+        print('Code de statut non-200: ${response.statusCode}');
+        // Ne pas mettre l'état en erreur, juste retourner false
         return false;
       }
     } catch (e, st) {
-      state = AsyncValue.error('Erreur de connexion au serveur: $e', st);
+      print('Erreur updateProfile: $e');
+      print('Stack trace: $st');
+      // Ne pas mettre l'état en erreur pour éviter de casser l'UI
       return false;
     }
   }
@@ -123,6 +161,119 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
     if (currentEtudiant != null) {
       final updatedEtudiant = currentEtudiant.copyWith(solde: newBalance);
       await setEtudiant(updatedEtudiant);
+    }
+  }
+
+  // Méthode pour uploader une photo de profil (compatible mobile et web)
+  Future<bool> uploadProfilePhoto(String imagePath) async {
+    final currentEtudiant = state.value;
+    if (currentEtudiant?.id == null) {
+      state = AsyncValue.error('Aucun étudiant connecté', StackTrace.current);
+      return false;
+    }
+
+    try {
+      MultipartFile multipartFile;
+
+      if (kIsWeb) {
+        // Pour le web, on ne peut pas utiliser dart:io
+        // Il faudrait passer directement les bytes depuis le picker
+        throw Exception(
+          'Upload de photo non supporté sur le web pour le moment',
+        );
+      } else {
+        // Pour mobile/desktop
+        final file = File(imagePath);
+        final bytes = await file.readAsBytes();
+
+        multipartFile = MultipartFile.fromBytes(
+          bytes,
+          filename: 'profile_photo.jpg',
+        );
+      }
+
+      final formData = FormData.fromMap({'photo': multipartFile});
+
+      final response = await _dio.post(
+        '/etudiant/${currentEtudiant!.id}/photo',
+        data: formData,
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Récupérer les données mises à jour
+        final updatedEtudiant = Etudiant.fromJson(response.data['etudiant']);
+        await setEtudiant(updatedEtudiant);
+        return true;
+      }
+      return false;
+    } catch (e, st) {
+      print('Erreur upload photo: $e');
+      state = AsyncValue.error('Erreur lors de l\'upload de la photo: $e', st);
+      return false;
+    }
+  }
+
+  // Méthode alternative qui accepte directement les bytes (compatible web et mobile)
+  Future<bool> uploadProfilePhotoFromBytes(
+    Uint8List bytes,
+    String filename,
+  ) async {
+    final currentEtudiant = state.value;
+    if (currentEtudiant?.id == null) {
+      state = AsyncValue.error('Aucun étudiant connecté', StackTrace.current);
+      return false;
+    }
+
+    try {
+      final formData = FormData.fromMap({
+        'photo': MultipartFile.fromBytes(bytes, filename: filename),
+      });
+
+      final response = await _dio.post(
+        '/etudiant/${currentEtudiant!.id}/photo',
+        data: formData,
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Récupérer les données mises à jour
+        final updatedEtudiant = Etudiant.fromJson(response.data['etudiant']);
+        await setEtudiant(updatedEtudiant);
+        return true;
+      }
+      return false;
+    } catch (e, st) {
+      print('Erreur upload photo from bytes: $e');
+      state = AsyncValue.error('Erreur lors de l\'upload de la photo: $e', st);
+      return false;
+    }
+  }
+
+  // Méthode pour supprimer la photo de profil
+  Future<bool> deleteProfilePhoto() async {
+    final currentEtudiant = state.value;
+    if (currentEtudiant?.id == null) {
+      state = AsyncValue.error('Aucun étudiant connecté', StackTrace.current);
+      return false;
+    }
+
+    try {
+      final response = await _dio.delete(
+        '/etudiant/${currentEtudiant!.id}/photo',
+      );
+
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        // Récupérer les données mises à jour
+        final updatedEtudiant = Etudiant.fromJson(response.data['etudiant']);
+        await setEtudiant(updatedEtudiant);
+        return true;
+      }
+      return false;
+    } catch (e, st) {
+      state = AsyncValue.error(
+        'Erreur lors de la suppression de la photo: $e',
+        st,
+      );
+      return false;
     }
   }
 

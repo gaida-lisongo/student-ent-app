@@ -1,55 +1,247 @@
-import 'dart:io'; // Nécessaire pour File
+import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // Importation nécessaire
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:student_app/stores/student_provider.dart';
+import 'package:student_app/stores/dio_prodiver.dart';
 
-// Service utilitaire pour l'avatar (inchangé)
-class AvatarService {
-  static String getAvatarUrl(String seed) {
-    return 'https://api.dicebear.com/8.x/lorelei/png?seed=$seed';
-  }
-}
-
-// ----------------------------------------------------
-// WIDGET PRINCIPAL
-// ----------------------------------------------------
-
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
+class _ProfileScreenState extends ConsumerState<ProfileScreen>
     with TickerProviderStateMixin {
-  // Données de l'utilisateur (Mock data)
-  String userName = "Alice Dupont";
-  String matricule = "STD-2024-001";
-  String telephone = "+243 81 000 0001";
-  String email = "alice.dupont@student.edu";
-
-  // Stockage local de la photo sélectionnée
-  File? _imageFile;
-  String _avatarSeed = "Alice Dupont";
-
-  // --- LOGIQUE DE SELECTION DE PHOTO (image_picker) ---
   final ImagePicker _picker = ImagePicker();
+  bool _isUploadingPhoto = false;
+  bool _isUpdating = false;
 
-  Future<void> _pickNewPhoto() async {
+  // Contrôleurs pour les formulaires
+  final _personalFormKey = GlobalKey<FormState>();
+  final _phoneFormKey = GlobalKey<FormState>();
+  final _emailFormKey = GlobalKey<FormState>();
+  final _addressFormKey = GlobalKey<FormState>();
+
+  // Contrôleurs de texte
+  late TextEditingController _nomController;
+  late TextEditingController _postnomController;
+  late TextEditingController _prenomController;
+  late TextEditingController _telephoneController;
+  late TextEditingController _emailController;
+  late TextEditingController _adresseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nomController = TextEditingController();
+    _postnomController = TextEditingController();
+    _prenomController = TextEditingController();
+    _telephoneController = TextEditingController();
+    _emailController = TextEditingController();
+    _adresseController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _nomController.dispose();
+    _postnomController.dispose();
+    _prenomController.dispose();
+    _telephoneController.dispose();
+    _emailController.dispose();
+    _adresseController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAndUploadPhoto() async {
     final XFile? pickedFile = await _picker.pickImage(
       source: ImageSource.gallery,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 80,
     );
 
     if (pickedFile != null) {
       setState(() {
-        _imageFile = File(pickedFile.path);
+        _isUploadingPhoto = true;
       });
+
+      try {
+        // Lire les bytes du fichier sélectionné
+        final bytes = await pickedFile.readAsBytes();
+        final filename = pickedFile.name.isNotEmpty
+            ? pickedFile.name
+            : 'profile_photo.jpg';
+
+        final success = await ref
+            .read(etudiantProvider.notifier)
+            .uploadProfilePhotoFromBytes(bytes, filename);
+
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Photo de profil mise à jour avec succès'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erreur lors de la mise à jour de la photo'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _deletePhoto() async {
+    final success = await ref
+        .read(etudiantProvider.notifier)
+        .deleteProfilePhoto();
+
+    if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Photo de profil mise à jour localement.'),
+          content: Text('Photo supprimée avec succès'),
+          backgroundColor: Colors.green,
         ),
       );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erreur lors de la suppression de la photo'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _updatePersonalInfo() async {
+    if (!_personalFormKey.currentState!.validate()) return;
+
+    setState(() => _isUpdating = true);
+
+    final updateData = {
+      'nom': _nomController.text.trim(),
+      'post_nom': _postnomController.text.trim(),
+      'prenom': _prenomController.text.trim(),
+    };
+
+    final success = await ref
+        .read(etudiantProvider.notifier)
+        .updateProfile(updateData);
+
+    if (mounted) {
+      setState(() => _isUpdating = false);
+      if (success) {
+        // Forcer la mise à jour de l'UI
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Informations personnelles mises à jour'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la mise à jour'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateContactInfo() async {
+    if (!_emailFormKey.currentState!.validate() ||
+        !_phoneFormKey.currentState!.validate())
+      return;
+
+    setState(() => _isUpdating = true);
+
+    late Map<String, String> updateData = {};
+
+    if (_telephoneController.text.trim().isNotEmpty) {
+      updateData['telephone'] = _telephoneController.text.trim();
+    }
+
+    if (_emailController.text.trim().isNotEmpty) {
+      updateData['email'] = _emailController.text.trim();
+    }
+
+    print("Updating contact info: $updateData");
+
+    final success = await ref
+        .read(etudiantProvider.notifier)
+        .updateProfile(updateData);
+
+    if (mounted) {
+      setState(() => _isUpdating = false);
+      if (success) {
+        // Forcer la mise à jour de l'UI
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Coordonnées mises à jour'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la mise à jour'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateAddressInfo() async {
+    if (!_addressFormKey.currentState!.validate()) return;
+
+    setState(() => _isUpdating = true);
+
+    final updateData = {'adresse': _adresseController.text.trim()};
+
+    final success = await ref
+        .read(etudiantProvider.notifier)
+        .updateProfile(updateData);
+
+    if (mounted) {
+      setState(() => _isUpdating = false);
+      if (success) {
+        // Forcer la mise à jour de l'UI
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Adresse mise à jour'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la mise à jour'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -57,7 +249,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _showEditModal({
     required String title,
     required Widget formContent,
-    required VoidCallback onSave,
+    required Future<void> Function() onSave,
   }) {
     showModalBottomSheet(
       context: context,
@@ -113,25 +305,40 @@ class _ProfileScreenState extends State<ProfileScreen>
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    onSave();
-                    Navigator.pop(context);
-                  },
+                  onPressed: _isUpdating
+                      ? null
+                      : () async {
+                          await onSave();
+                          if (mounted) Navigator.pop(context);
+                        },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black, // Bouton noir
+                    backgroundColor: _isUpdating
+                        ? Colors.grey
+                        : Colors.black, // Bouton gris si loading
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text(
-                    'Sauvegarder',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: _isUpdating
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Text(
+                          'Sauvegarder',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -170,139 +377,352 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildPersonalInfoForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextFormField(decoration: _chicInputDecoration('Nom')),
-        const SizedBox(height: 15),
-        TextFormField(decoration: _chicInputDecoration('Post Nom')),
-        const SizedBox(height: 15),
-        TextFormField(decoration: _chicInputDecoration('Prénom')),
-        const SizedBox(height: 15),
-        TextFormField(decoration: _chicInputDecoration('Lieu de Naissance')),
-        const SizedBox(height: 15),
-        TextFormField(
-          decoration: _chicInputDecoration('Date de Naissance'),
-          keyboardType: TextInputType.datetime,
-        ),
-      ],
+  Widget _buildPersonalInfoForm(etudiant) {
+    _nomController.text = etudiant.nom ?? '';
+    _postnomController.text = etudiant.postNom ?? '';
+    _prenomController.text = etudiant.prenom ?? '';
+
+    return Form(
+      key: _personalFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _nomController,
+            decoration: _chicInputDecoration('Nom'),
+            validator: (value) => value?.isEmpty == true ? 'Nom requis' : null,
+          ),
+          const SizedBox(height: 15),
+          TextFormField(
+            controller: _postnomController,
+            decoration: _chicInputDecoration('Post Nom'),
+            validator: (value) =>
+                value?.isEmpty == true ? 'Post nom requis' : null,
+          ),
+          const SizedBox(height: 15),
+          TextFormField(
+            controller: _prenomController,
+            decoration: _chicInputDecoration('Prénom'),
+            validator: (value) =>
+                value?.isEmpty == true ? 'Prénom requis' : null,
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildAddressForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextFormField(
-          decoration: _chicInputDecoration('Adresse Complète'),
-          maxLines: 3,
-        ),
-      ],
+  Widget _buildAddressForm(etudiant) {
+    _adresseController.text = etudiant.adresse ?? '';
+
+    return Form(
+      key: _addressFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _adresseController,
+            decoration: _chicInputDecoration('Adresse Complète'),
+            maxLines: 3,
+            validator: (value) =>
+                value?.isEmpty == true ? 'Adresse requise' : null,
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildContactForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextFormField(
-          decoration: _chicInputDecoration('Téléphone', hint: telephone),
-          keyboardType: TextInputType.phone,
-        ),
-        const SizedBox(height: 15),
-        TextFormField(
-          decoration: _chicInputDecoration('Email', hint: email),
-          keyboardType: TextInputType.emailAddress,
-        ),
-      ],
+  Widget _buildPhoneForm(etudiant) {
+    _telephoneController.text = etudiant.telephone ?? '';
+
+    return Form(
+      key: _phoneFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _telephoneController,
+            decoration: _chicInputDecoration('Téléphone'),
+            keyboardType: TextInputType.phone,
+            validator: (value) =>
+                value?.isEmpty == true ? 'Téléphone requis' : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmailForm(etudiant) {
+    _emailController.text = etudiant.email ?? '';
+
+    return Form(
+      key: _emailFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 15),
+          TextFormField(
+            controller: _emailController,
+            decoration: _chicInputDecoration('Email'),
+            keyboardType: TextInputType.emailAddress,
+            validator: (value) {
+              if (value?.isEmpty == true) return 'Email requis';
+              if (!value!.contains('@')) return 'Email invalide';
+              return null;
+            },
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final etudiantState = ref.watch(etudiantProvider);
+
     return Scaffold(
-      backgroundColor: Colors.white, // Fond blanc pur
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            20.0,
-            20.0,
-            20.0,
-            80.0,
-          ), // Ajouter du padding en bas pour la barre flottante
-          children: <Widget>[
-            // 1. Titre de la page
-            const Text(
-              'Mon Profil',
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w900, // Extra Bold
-                color: Colors.black,
+      backgroundColor: Colors.grey[50],
+      body: etudiantState.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+              const SizedBox(height: 16),
+              Text('Erreur: $error'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(etudiantProvider),
+                child: const Text('Réessayer'),
               ),
-            ),
-            const SizedBox(height: 35),
+            ],
+          ),
+        ),
+        data: (etudiant) {
+          if (etudiant == null) {
+            return const Center(
+              child: Text('Aucune donnée étudiant disponible'),
+            );
+          }
 
-            // 2. Photo de l'avatar et sélection (Stylisation BackdropFilter)
-            _buildAvatarSection(context),
-            const SizedBox(height: 20),
-
-            // 3. Nom et Matricule
-            Center(
-              child: Column(
-                children: [
-                  Text(
-                    userName,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
+          return SafeArea(
+            child: CustomScrollView(
+              slivers: [
+                // App Bar moderne
+                SliverAppBar(
+                  expandedHeight: 100,
+                  floating: false,
+                  pinned: true,
+                  backgroundColor: Colors.white,
+                  elevation: 0,
+                  flexibleSpace: const FlexibleSpaceBar(
+                    titlePadding: EdgeInsets.only(left: 20, bottom: 16),
+                    title: Text(
+                      'Mon Profil',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  Text(
-                    'Matricule: $matricule',
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 40),
+                ),
 
-            // 4. Section des Informations Modifiables
-            _buildProfileCard(
-              icon: Icons.person_outline,
-              title: "Informations Personnelles",
-              subtitle: "Nom, post-nom, prénom, sexe, date de naissance...",
-              onTap: () => _showEditModal(
-                title: "les informations personnelles",
-                formContent: _buildPersonalInfoForm(),
-                onSave: () {
-                  /* Logique de sauvegarde */
-                },
-              ),
+                // Contenu principal
+                SliverPadding(
+                  padding: const EdgeInsets.all(20),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // Section photo et infos principales
+                      _buildProfileHeader(etudiant),
+                      const SizedBox(height: 40),
+
+                      // Informations personnelles
+                      _buildSectionTitle('Informations personnelles'),
+                      _buildProfileCard(
+                        icon: Icons.person_outline,
+                        title: 'Informations personnelles',
+                        subtitle:
+                            '${etudiant.nom} ${etudiant.postNom} ${etudiant.prenom}',
+                        onTap: () => _showEditModal(
+                          title: 'les informations personnelles',
+                          formContent: _buildPersonalInfoForm(etudiant),
+                          onSave: _updatePersonalInfo,
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Contact
+                      _buildSectionTitle('Contact'),
+                      _buildProfileCard(
+                        icon: Icons.phone_outlined,
+                        title: 'Téléphone',
+                        subtitle: etudiant.telephone ?? 'Non renseigné',
+                        onTap: () => _showEditModal(
+                          title: 'les coordonnées',
+                          formContent: _buildPhoneForm(etudiant),
+                          onSave: _updateContactInfo,
+                        ),
+                      ),
+                      _buildProfileCard(
+                        icon: Icons.email_outlined,
+                        title: 'Email',
+                        subtitle: etudiant.email ?? 'Non renseigné',
+                        onTap: () => _showEditModal(
+                          title: 'les coordonnées',
+                          formContent: _buildEmailForm(etudiant),
+                          onSave: _updateContactInfo,
+                        ),
+                      ),
+
+                      const SizedBox(height: 20), // Espace pour navigation
+                      // Adresse
+                      _buildSectionTitle('Adresse'),
+                      _buildProfileCard(
+                        icon: Icons.location_on_outlined,
+                        title: 'Adresse',
+                        subtitle: etudiant.adresse ?? 'Non renseignée',
+                        onTap: () => _showEditModal(
+                          title: 'l\'adresse',
+                          formContent: _buildAddressForm(etudiant),
+                          onSave: _updateAddressInfo,
+                        ),
+                      ),
+
+                      const SizedBox(height: 20), // Espace pour navigation
+                    ]),
+                  ),
+                ),
+              ],
             ),
-            _buildProfileCard(
-              icon: Icons.location_on_outlined,
-              title: "Coordonnées",
-              subtitle: "Adresse physique...",
-              onTap: () => _showEditModal(
-                title: "les coordonnées",
-                formContent: _buildAddressForm(),
-                onSave: () {
-                  /* Logique de sauvegarde */
-                },
-              ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildProfileHeader(etudiant) {
+    return Card(
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.indigo[400]!, Colors.indigo[600]!],
+          ),
+        ),
+        child: Column(
+          children: [
+            // Photo de profil
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 60,
+                  backgroundColor: Colors.white,
+                  child: CircleAvatar(
+                    radius: 56,
+                    backgroundImage: etudiant.photo != null
+                        ? NetworkImage(
+                            'http://192.168.1.100:3000${etudiant.photo}',
+                          ) // URL complète
+                        : null,
+                    child: etudiant.photo == null
+                        ? Text(
+                            '${etudiant.nom?[0] ?? ''}${etudiant.prenom?[0] ?? ''}',
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
+                if (_isUploadingPhoto)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: PopupMenuButton<String>(
+                      icon: const Icon(Icons.camera_alt, color: Colors.indigo),
+                      onSelected: (value) {
+                        if (value == 'upload') {
+                          _pickAndUploadPhoto();
+                        } else if (value == 'delete') {
+                          _deletePhoto();
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'upload',
+                          child: ListTile(
+                            leading: Icon(Icons.upload),
+                            title: Text('Changer la photo'),
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        if (etudiant.photo != null)
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: ListTile(
+                              leading: Icon(Icons.delete, color: Colors.red),
+                              title: Text('Supprimer la photo'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            _buildProfileCard(
-              icon: Icons.phone_outlined,
-              title: "Contact",
-              subtitle: "Numéro de téléphone, email...",
-              onTap: () => _showEditModal(
-                title: "le contact",
-                formContent: _buildContactForm(),
-                onSave: () {
-                  /* Logique de sauvegarde */
-                },
+            const SizedBox(height: 16),
+
+            // Nom complet
+            Text(
+              '${etudiant.nom ?? ''} ${etudiant.postNom ?? ''} ${etudiant.prenom ?? ''}'
+                  .trim(),
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+
+            // Matricule
+            Text(
+              'Matricule: ${etudiant.matricule ?? 'Non défini'}',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white.withOpacity(0.9),
               ),
             ),
           ],
@@ -311,54 +731,47 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  // ----------------------------------------------------
-  // WIDGETS DE COMPOSANTS RÉUTILISABLES STYLISÉS
-  // ----------------------------------------------------
-
-  // 1. Section Avatar avec Photo Locale/Réseau et Bouton de Modification
-  Widget _buildAvatarSection(BuildContext context) {
-    // Déterminer la source de l'image
-    ImageProvider imageProvider;
-    if (_imageFile != null) {
-      imageProvider = FileImage(_imageFile!);
-    } else {
-      imageProvider = NetworkImage(AvatarService.getAvatarUrl(_avatarSeed));
-    }
-
-    return Center(
-      child: Stack(
-        children: [
-          CircleAvatar(
-            radius: 60, // Augmenter la taille
-            backgroundImage: imageProvider,
-            backgroundColor: Colors.grey.shade100,
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: GestureDetector(
-              onTap: _pickNewPhoto,
-              child: Container(
-                padding: const EdgeInsets.all(8), // Plus grand
-                decoration: BoxDecoration(
-                  color: Colors.indigo, // Bleu foncé chic
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 3),
-                ),
-                child: const Icon(
-                  Icons.camera_alt,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-            ),
-          ),
-        ],
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
       ),
     );
   }
 
-  // 2. Carte d'Information (Design minimaliste chic)
+  Widget _buildInfoCard(String title, String value) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+            color: Colors.black87,
+          ),
+        ),
+        subtitle: Text(
+          value,
+          style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
+        ),
+      ),
+    );
+  }
+
   Widget _buildProfileCard({
     required IconData icon,
     required String title,
@@ -367,16 +780,15 @@ class _ProfileScreenState extends State<ProfileScreen>
   }) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0, // Enlever l'ombre pour un look plus plat/moderne
-      color: Colors.grey.shade50, // Fond très clair
+      elevation: 0,
+      color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
-        side: BorderSide(color: Colors.grey.shade200, width: 1), // Bordure fine
+        side: BorderSide(color: Colors.grey.shade200, width: 1),
       ),
       child: ListTile(
         onTap: onTap,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        // Icône de la section (Couleur bleue chic)
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -385,11 +797,10 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
           child: Icon(icon, color: Colors.indigo, size: 24),
         ),
-        // Titre et Sous-titre
         title: Text(
           title,
           style: const TextStyle(
-            fontWeight: FontWeight.w600, // Semi-bold
+            fontWeight: FontWeight.w600,
             fontSize: 16,
             color: Colors.black87,
           ),
@@ -398,7 +809,6 @@ class _ProfileScreenState extends State<ProfileScreen>
           subtitle,
           style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
         ),
-        // Icône de navigation (flèche)
         trailing: const Icon(
           Icons.arrow_forward_ios,
           size: 14,
