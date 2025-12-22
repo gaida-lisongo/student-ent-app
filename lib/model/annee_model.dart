@@ -16,6 +16,10 @@ class Annee {
     this.updatedAt,
   });
 
+  factory Annee.empty() {
+    return Annee(id: '', debut: 0, fin: 0, isActive: false);
+  }
+
   factory Annee.fromJson(Map<String, dynamic> json) {
     return Annee(
       id: json['_id'] as String,

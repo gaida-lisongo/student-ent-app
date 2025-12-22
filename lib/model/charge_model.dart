@@ -31,6 +31,20 @@ class Enseignant {
     this.updatedAt,
   });
 
+  factory Enseignant.empty() {
+    return Enseignant(
+      id: '',
+      nom: '',
+      postNom: '',
+      sexe: '',
+      matricule: '',
+      prenom: '',
+      grade: '',
+      email: '',
+      telephone: '',
+    );
+  }
+
   factory Enseignant.fromJson(Map<String, dynamic> json) {
     return Enseignant(
       id: json['_id'] as String,
@@ -68,11 +82,78 @@ class Enseignant {
   }
 }
 
+class Promotion {
+  final String id;
+  final String designation;
+  final String systeme;
+  final String niveau;
+  final String cycle;
+  final List<String> semestres;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  Promotion({
+    required this.id,
+    required this.designation,
+    required this.systeme,
+    required this.niveau,
+    required this.cycle,
+    required this.semestres,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory Promotion.empty() {
+    return Promotion(
+      id: '',
+      designation: '',
+      systeme: '',
+      niveau: '',
+      cycle: '',
+      semestres: [],
+    );
+  }
+
+  factory Promotion.fromJson(Map<String, dynamic> json) {
+    return Promotion(
+      id: json['_id'] as String,
+      designation: json['designation'] as String? ?? '',
+      systeme: json['systeme'] as String? ?? '',
+      niveau: json['niveau'] as String? ?? '',
+      cycle: json['cycle'] as String? ?? '',
+      semestres: json['semestres'] != null
+          ? List<String>.from(json['semestres'])
+          : [],
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : null,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      '_id': id,
+      'designation': designation,
+      'systeme': systeme,
+      'niveau': niveau,
+      'cycle': cycle,
+      'semestres': semestres,
+      'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
+    };
+  }
+}
+
 class Charge {
   final String id;
   final Matiere cours;
   final Annee anneeId;
+  final Promotion? promotionId;
   final Enseignant enseignant;
+  final String status;
   final String evaluation;
   final String objectif;
   final String methodologie;
@@ -81,12 +162,18 @@ class Charge {
   final List<Activity>? activities;
   final List<Seance>? seances;
   final List<Ressource>? ressources;
+  final List<dynamic>? recours;
+  final List<dynamic>? plannings;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   Charge({
     required this.id,
     required this.cours,
     required this.anneeId,
+    this.promotionId,
     required this.enseignant,
+    required this.status,
     required this.evaluation,
     required this.objectif,
     required this.methodologie,
@@ -95,16 +182,45 @@ class Charge {
     this.activities,
     this.seances,
     this.ressources,
+    this.recours,
+    this.plannings,
+    this.createdAt,
+    this.updatedAt,
   });
+
+  factory Charge.empty() {
+    return Charge(
+      id: '',
+      cours: Matiere.empty(),
+      anneeId: Annee.empty(),
+      promotionId: Promotion.empty(),
+      enseignant: Enseignant.empty(),
+      status: '',
+      evaluation: '',
+      objectif: '',
+      methodologie: '',
+      contenu: '',
+      references: '',
+      activities: [],
+      seances: [],
+      ressources: [],
+      recours: [],
+      plannings: [],
+    );
+  }
 
   factory Charge.fromJson(Map<String, dynamic> json) {
     return Charge(
       id: json['_id'] as String,
       cours: Matiere.fromJson(json['cours'] as Map<String, dynamic>),
       anneeId: Annee.fromJson(json['anneeId'] as Map<String, dynamic>),
+      promotionId: json['promotionId'] != null
+          ? Promotion.fromJson(json['promotionId'] as Map<String, dynamic>)
+          : null,
       enseignant: Enseignant.fromJson(
-        json['enseignantId'] as Map<String, dynamic>,
+        json['enseignant'] as Map<String, dynamic>,
       ),
+      status: json['status'] as String? ?? '',
       evaluation: json['evaluation'] as String? ?? '',
       objectif: json['objectif'] as String? ?? '',
       methodologie: json['methodologie'] as String? ?? '',
@@ -134,6 +250,14 @@ class Charge {
                 )
                 .toList()
           : [],
+      recours: json['recours'] as List<dynamic>? ?? [],
+      plannings: json['plannings'] as List<dynamic>? ?? [],
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : null,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : null,
     );
   }
 
@@ -142,7 +266,9 @@ class Charge {
       '_id': id,
       'cours': cours.toJson(),
       'anneeId': anneeId.toJson(),
-      'enseignantId': enseignant.toJson(),
+      'promotionId': promotionId?.toJson(),
+      'enseignant': enseignant.toJson(),
+      'status': status,
       'evaluation': evaluation,
       'objectif': objectif,
       'methodologie': methodologie,
@@ -151,6 +277,10 @@ class Charge {
       'activities': activities?.map((a) => a.toJson()).toList(),
       'seances': seances?.map((s) => s.toJson()).toList(),
       'ressources': ressources?.map((r) => r.toJson()).toList(),
+      'recours': recours,
+      'plannings': plannings,
+      'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
     };
   }
 }

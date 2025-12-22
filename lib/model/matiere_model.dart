@@ -18,6 +18,16 @@ class Matiere {
     this.updatedAt,
   });
 
+  factory Matiere.empty() {
+    return Matiere(
+      id: '',
+      designation: '',
+      code: '',
+      descriptions: '',
+      credits: 0,
+    );
+  }
+
   factory Matiere.fromJson(Map<String, dynamic> json) {
     return Matiere(
       id: json['_id'] as String,
