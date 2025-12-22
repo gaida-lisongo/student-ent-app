@@ -194,7 +194,7 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
 
       final formData = FormData.fromMap({'photo': multipartFile});
 
-      final response = await _dio.post(
+      final response = await _dio.put(
         '/etudiant/${currentEtudiant!.id}/photo',
         data: formData,
       );
@@ -229,7 +229,7 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
         'photo': MultipartFile.fromBytes(bytes, filename: filename),
       });
 
-      final response = await _dio.post(
+      final response = await _dio.put(
         '/etudiant/${currentEtudiant!.id}/photo',
         data: formData,
       );

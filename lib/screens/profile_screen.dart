@@ -169,24 +169,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     }
   }
 
-  Future<void> _updateContactInfo() async {
-    if (!_emailFormKey.currentState!.validate() ||
-        !_phoneFormKey.currentState!.validate())
-      return;
+  Future<void> _updatePhone() async {
+    if (!_phoneFormKey.currentState!.validate()) return;
 
     setState(() => _isUpdating = true);
 
-    late Map<String, String> updateData = {};
-
-    if (_telephoneController.text.trim().isNotEmpty) {
-      updateData['telephone'] = _telephoneController.text.trim();
-    }
-
-    if (_emailController.text.trim().isNotEmpty) {
-      updateData['email'] = _emailController.text.trim();
-    }
-
-    print("Updating contact info: $updateData");
+    final updateData = {'telephone': _telephoneController.text.trim()};
 
     final success = await ref
         .read(etudiantProvider.notifier)
@@ -195,10 +183,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     if (mounted) {
       setState(() => _isUpdating = false);
       if (success) {
-        // Forcer la mise à jour de l'UI
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Coordonnées mises à jour'),
+            content: Text('Numéro de téléphone mis à jour'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la mise à jour'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateEmail() async {
+    if (!_emailFormKey.currentState!.validate()) return;
+
+    setState(() => _isUpdating = true);
+
+    final updateData = {'email': _emailController.text.trim()};
+
+    final success = await ref
+        .read(etudiantProvider.notifier)
+        .updateProfile(updateData);
+
+    if (mounted) {
+      setState(() => _isUpdating = false);
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Email mis à jour'),
             backgroundColor: Colors.green,
           ),
         );
@@ -560,9 +578,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         title: 'Téléphone',
                         subtitle: etudiant.telephone ?? 'Non renseigné',
                         onTap: () => _showEditModal(
-                          title: 'les coordonnées',
+                          title: 'le numéro de téléphone',
                           formContent: _buildPhoneForm(etudiant),
-                          onSave: _updateContactInfo,
+                          onSave: _updatePhone,
                         ),
                       ),
                       _buildProfileCard(
@@ -570,9 +588,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         title: 'Email',
                         subtitle: etudiant.email ?? 'Non renseigné',
                         onTap: () => _showEditModal(
-                          title: 'les coordonnées',
+                          title: 'l\'adresse email',
                           formContent: _buildEmailForm(etudiant),
-                          onSave: _updateContactInfo,
+                          onSave: _updateEmail,
                         ),
                       ),
 
@@ -590,7 +608,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                         ),
                       ),
 
-                      const SizedBox(height: 20), // Espace pour navigation
+                      const SizedBox(height: 100), // Espace pour navigation
                     ]),
                   ),
                 ),
@@ -627,9 +645,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   child: CircleAvatar(
                     radius: 56,
                     backgroundImage: etudiant.photo != null
-                        ? NetworkImage(
-                            'http://192.168.1.100:3000${etudiant.photo}',
-                          ) // URL complète
+                        ? NetworkImage('${etudiant.photo}') // URL complète
                         : null,
                     child: etudiant.photo == null
                         ? Text(
@@ -723,6 +739,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.white.withOpacity(0.9),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Solde
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                'Solde: ${etudiant.solde?.toStringAsFixed(2) ?? '0.00'} CDF',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.indigo[700],
+                ),
               ),
             ),
           ],
