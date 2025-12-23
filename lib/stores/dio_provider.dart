@@ -2,29 +2,27 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-final dioProvider = Provider(
-  (ref) {
-    final dio = Dio(
-      BaseOptions(
-        baseUrl: 'https://app.inbtp.net/api', // Replace with your API base URL
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
-      ),
-    );
+final dioProvider = Provider((ref) {
+  final dio = Dio(
+    BaseOptions(
+      baseUrl: 'https://app.inbtp.net/api', // Replace with your API base URL
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 30),
+    ),
+  );
 
-    dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) async {
-          const storage = FlutterSecureStorage();
-          final token = await storage.read(key: 'auth_token');
-          if (token != null) {
-            options.headers['Authorization'] = 'Bearer $token';
-          }
-          return handler.next(options);
-        },
-      ),
-    );
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        const storage = FlutterSecureStorage();
+        final token = await storage.read(key: 'auth_token');
+        if (token != null) {
+          options.headers['Authorization'] = 'Bearer $token';
+        }
+        return handler.next(options);
+      },
+    ),
+  );
 
-    return dio;
-  },
-);
+  return dio;
+});

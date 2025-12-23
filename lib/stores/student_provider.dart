@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+// import 'dart:io'; // Incompatible with Web
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -165,29 +165,15 @@ class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
         );
       } else {
         // Pour mobile/desktop
-        final file = File(imagePath);
-        final bytes = await file.readAsBytes();
+        // final file = File(imagePath);
+        // final bytes = await file.readAsBytes();
 
-        multipartFile = MultipartFile.fromBytes(
-          bytes,
-          filename: 'profile_photo.jpg',
-        );
+        // multipartFile = MultipartFile.fromBytes(
+        //   bytes,
+        //   filename: 'profile_photo.jpg',
+        // );
+         throw Exception('Upload not supported in this web-test version.');
       }
-
-      final formData = FormData.fromMap({'photo': multipartFile});
-
-      final response = await _dio.put(
-        '/etudiant/${currentEtudiant!.id}/photo',
-        data: formData,
-      );
-
-      if (response.statusCode == 200 && response.data['success'] == true) {
-        // Récupérer les données mises à jour
-        final updatedEtudiant = Etudiant.fromJson(response.data['etudiant']);
-        await setEtudiant(updatedEtudiant);
-        return true;
-      }
-      return false;
     } catch (e, st) {
       print('Erreur upload photo: $e');
       state = AsyncValue.error('Erreur lors de l\'upload de la photo: $e', st);

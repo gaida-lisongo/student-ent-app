@@ -46,6 +46,67 @@ class MatiereProvider extends StateNotifier<Charge> {
       rethrow;
     }
   }
+
+  // Vérifier si l'étudiant est déjà présent
+  Future<Map<String, dynamic>> checkPresence(
+    String seanceId,
+    String studentId,
+  ) async {
+    try {
+      final response = await _dio.get(
+        '/seances/$seanceId',
+        queryParameters: {'studentId': studentId},
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      } else {
+        throw Exception(
+          'Erreur lors de la vérification de présence: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      print('Erreur checkPresence: $e');
+      rethrow;
+    }
+  }
+
+  // Marquer la présence
+  Future<Map<String, dynamic>> markPresence({
+    required String seanceId,
+    required String studentId,
+    required String locationQr,
+    required String locationStudent,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/seances/$seanceId',
+        data: {
+          'studentId': studentId,
+          'locationQr': locationQr,
+          'locationStudent': locationStudent,
+        },
+      );
+
+      if (response.statusCode == 201) {
+        final responseData = response.data as Map<String, dynamic>;
+
+        // Rafraîchir les données de la matière pour mettre à jour la liste des présences
+        // Note: Cela suppose que nous avons accès à matiereId et anneeId.
+        // Si non, on pourrait devoir les stocker dans le state ou les passer en paramètre.
+        // Pour l'instant, on retourne juste le succès.
+
+        return responseData;
+      } else {
+        throw Exception(
+          'Erreur lors du marquage de la présence: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      print('Erreur markPresence: $e');
+      rethrow;
+    }
+  }
 }
 
 final matiereProvider = StateNotifierProvider<MatiereProvider, Charge>((ref) {

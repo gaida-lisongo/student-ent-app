@@ -6,9 +6,13 @@ import 'package:student_app/model/matiere_model.dart';
 import 'package:student_app/model/promotion_model.dart';
 import 'package:student_app/model/semestre_model.dart';
 import 'package:student_app/model/unite_model.dart';
+import 'package:student_app/model/seance_model.dart';
 import 'package:student_app/stores/annee_provider.dart';
 import 'package:student_app/stores/matiere_provider.dart';
 import 'package:student_app/stores/promotion_provider.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:student_app/screens/scanner_screen.dart';
+import 'package:student_app/stores/student_provider.dart';
 
 class MatiereScreen extends ConsumerStatefulWidget {
   final Matiere matiere;
@@ -1037,7 +1041,7 @@ class _MatiereScreenState extends ConsumerState<MatiereScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    _showQRScannerBottomSheet(seance.topic);
+                    _handleScanPresenceClick(seance);
                   },
                   icon: const Icon(Icons.qr_code_scanner, size: 18),
                   label: const Text('Scanner présence'),
@@ -1375,13 +1379,51 @@ class _MatiereScreenState extends ConsumerState<MatiereScreen> {
     );
   }
 
-  void _showQRScannerBottomSheet(String seanceTitle) {
+  Future<void> _handleScanPresenceClick(Seance seance) async {
+    // 1. Get Student
+    final student = ref.read(etudiantProvider).value;
+    if (student == null) {
+      _showError('Session étudiante introuvable. Veuillez vous reconnecter.');
+      return;
+    }
+
+    // 2. Show Loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // 3. Check Presence
+      final matiereNotifier = ref.read(matiereProvider.notifier);
+      final checkResult = await matiereNotifier.checkPresence(
+        seance.id,
+        student.id,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+
+      // 4. Determine State & Show Sheet
+      final isAlreadyPresent = checkResult['exists'] == true;
+      _showQRScannerBottomSheet(seance, isAlreadyPresent: isAlreadyPresent);
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        _showError('Erreur de vérification: $e');
+      }
+    }
+  }
+
+  void _showQRScannerBottomSheet(Seance seance,
+      {required bool isAlreadyPresent}) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
+        height: MediaQuery.of(context).size.height * 0.55,
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -1405,18 +1447,23 @@ class _MatiereScreenState extends ConsumerState<MatiereScreen> {
               child: Row(
                 children: [
                   Icon(
-                    Icons.qr_code_scanner,
-                    color: Colors.purple[600],
+                    isAlreadyPresent
+                        ? Icons.check_circle
+                        : Icons.qr_code_scanner,
+                    color:
+                        isAlreadyPresent ? Colors.green[600] : Colors.purple[600],
                     size: 24,
                   ),
                   const SizedBox(width: 15),
                   Expanded(
                     child: Text(
-                      'Scanner présence',
+                      isAlreadyPresent ? 'Présence validée' : 'Scanner présence',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.purple[600],
+                        color: isAlreadyPresent
+                            ? Colors.green[600]
+                            : Colors.purple[600],
                       ),
                     ),
                   ),
@@ -1430,63 +1477,265 @@ class _MatiereScreenState extends ConsumerState<MatiereScreen> {
 
             const Divider(height: 1),
 
-            // Scanner area simulation
             Expanded(
-              child: Container(
-                margin: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.purple[300]!, width: 2),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.qr_code_scanner,
-                      size: 100,
-                      color: Colors.purple[300],
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Placez le QR Code dans le cadre',
-                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 30),
-                    ElevatedButton(
-                      onPressed: () {
-                        // Simulation de scan réussi
-                        String qrData =
-                            'PRESENCE_${seanceTitle}_${DateTime.now().millisecondsSinceEpoch}';
-                        print('QR Code scanné: $qrData');
-
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Présence enregistrée pour: $seanceTitle',
-                            ),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.purple,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
-                          vertical: 12,
-                        ),
-                      ),
-                      child: const Text('Simuler scan'),
-                    ),
-                  ],
-                ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: isAlreadyPresent
+                    ? _buildAlreadyPresentView()
+                    : _buildScannerInstructionsView(seance),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAlreadyPresentView() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const SizedBox(height: 20),
+        Icon(Icons.verified_user, size: 80, color: Colors.green[400]),
+        const SizedBox(height: 20),
+        Text(
+          'Vous êtes déjà noté présent(e) !',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Votre présence pour cette séance a bien été enregistrée.',
+          style: TextStyle(color: Colors.grey[600]),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScannerInstructionsView(Seance seance) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Instructions',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+        ),
+        const SizedBox(height: 15),
+        _buildStep('1', 'Autoriser la localisation', Icons.location_on),
+        const SizedBox(height: 10),
+        _buildStep('2', 'Scanner le QR Code de la salle', Icons.qr_code_2),
+        const SizedBox(height: 10),
+        _buildStep('3', 'Validation immédiate', Icons.check_circle),
+        const SizedBox(height: 30),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => _startScanProcess(seance),
+            icon: const Icon(Icons.camera_alt),
+            label: const Text('Lancer le scan'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.purple,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Center(
+          child: Text(
+            'Assurez-vous d\'être dans la salle de cours.',
+            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStep(String number, String text, IconData icon) {
+    return Row(
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: Colors.purple.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.purple,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 15),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+        ),
+        Icon(icon, size: 20, color: Colors.grey[400]),
+      ],
+    );
+  }
+
+  Future<void> _startScanProcess(Seance seance) async {
+    Navigator.pop(context); // Close bottom sheet
+
+    // 1. Permissions Localisation
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showError('Les services de localisation sont désactivés.');
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        _showError('Les permissions de localisation sont refusées.');
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _showError('Les permissions de localisation sont définitivement refusées.');
+      return;
+    }
+
+    // 2. Récupérer Localisation
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading
+
+      // 3. Ouvrir Scanner
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ScannerScreen(
+            title: 'Scanner QR Séance',
+            onScanDataReceived: (code) =>
+                _processQRResult(code, seance, position),
+            showActionButton: false,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        _showError('Erreur de localisation: $e');
+      }
+    }
+  }
+
+  void _processQRResult(String code, Seance seance, Position position) async {
+    Navigator.pop(context); // Close Scanner
+
+    // 4. Parsing et Validation
+    final parts = code.split(':');
+    if (parts.length < 3) {
+      _showError('Code QR invalide');
+      return;
+    }
+
+    final qrSeanceId = parts[0];
+    final qrLocationPayload = "${parts[1]}:${parts[2]}";
+    final studentLocationPayload = "${position.latitude}:${position.longitude}";
+
+    if (qrSeanceId != seance.id) {
+      _showError('Ce QR Code ne correspond pas à la séance sélectionnée.');
+      return;
+    }
+
+    try {
+      final student = ref.read(etudiantProvider).value;
+      if (student == null) {
+        _showError('Session étudiante introuvable.');
+        return;
+      }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (c) => const Center(child: CircularProgressIndicator()),
+      );
+
+      final matiereNotifier = ref.read(matiereProvider.notifier);
+
+      // 5. Check Presence
+      final checkResult = await matiereNotifier.checkPresence(
+        seance.id,
+        student.id,
+      );
+
+      if (!mounted) return;
+
+      if (checkResult['exists'] == true) {
+        Navigator.pop(context); // Close dialog
+        _showSuccess('Vous êtes déjà noté présent(e) ! ✅');
+        return;
+      }
+
+      // 6. Submit Presence
+      await matiereNotifier.markPresence(
+        seanceId: seance.id,
+        studentId: student.id,
+        locationQr: qrLocationPayload,
+        locationStudent: studentLocationPayload,
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Close dialog
+        _showSuccess('Présence validée avec succès ! 🎉');
+        // Optionnel : Recharger les données
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        _showError('Erreur: $e'); // Afficher l'erreur (ex: trop loin)
+      }
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
     );
   }
 
