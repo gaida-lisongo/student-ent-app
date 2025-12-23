@@ -5,6 +5,7 @@ import 'package:student_app/stores/auth_provider.dart';
 import 'package:student_app/stores/student_provider.dart';
 import 'package:student_app/stores/annee_provider.dart';
 import 'package:student_app/model/inscription_model.dart';
+import 'package:student_app/screens/scanner_screen.dart';
 
 // Le WelcomeScreen doit être un ConsumerWidget pour interagir avec Riverpod
 class WelcomeScreen extends ConsumerWidget {
@@ -94,7 +95,22 @@ class WelcomeScreen extends ConsumerWidget {
     }
   }
 
-  // Nouvelle fonction pour simuler le scan (déclenchement direct)
+  // Navigation vers l'écran de scan pour l'authentification
+  void _navigateToScanner(BuildContext context, WidgetRef ref) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ScannerScreen(
+          title: 'Scanner votre QR Code',
+          onScanDataReceived: (String scanData) {
+            handleAuthScanResult(context, ref, scanData);
+          },
+          showActionButton: false, // Traitement automatique après scan
+        ),
+      ),
+    );
+  }
+
+  // Fonction pour simuler directement l'authentification (pour les tests)
   void _startSimulationLogin(BuildContext context, WidgetRef ref) {
     handleAuthScanResult(context, ref, simulationUrl);
   }
@@ -161,28 +177,50 @@ class WelcomeScreen extends ConsumerWidget {
 
                 // Description
                 const Text(
-                  'Simulation : Cliquez sur le bouton pour vous authentifier directement avec les données de test (QR Code de l\'ENT).',
+                  'Scannez votre QR Code ENT pour vous authentifier ou utilisez la simulation pour les tests.',
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.yellow, // Mettre en évidence la simulation
+                    color: Colors.white70,
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 50),
+                const SizedBox(height: 40),
 
-                // Bouton de Simulation / Authentification
+                // Bouton Principal - Scanner
                 Center(
                   child: Opacity(
                     opacity: isLoading ? 0.6 : 1.0,
                     child: CustomButton(
                       title: isLoading
                           ? 'CONNEXION EN COURS...'
-                          : 'SIMULATION AUTHENTIFICATION',
-                      icon: Icons.login,
+                          : 'SCANNER QR CODE',
+                      icon: Icons.qr_code_scanner,
                       onTap: isLoading
                           ? () {} // Callback vide pour désactiver
-                          : () => _startSimulationLogin(context, ref),
+                          : () => _navigateToScanner(context, ref),
                       isDarkMode: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Bouton Secondaire - Simulation (pour les tests)
+                Center(
+                  child: Opacity(
+                    opacity: isLoading ? 0.6 : 1.0,
+                    child: TextButton.icon(
+                      onPressed: isLoading
+                          ? null
+                          : () => _startSimulationLogin(context, ref),
+                      icon: const Icon(
+                        Icons.bug_report,
+                        color: Colors.yellow,
+                        size: 20,
+                      ),
+                      label: const Text(
+                        'Mode Simulation (Test)',
+                        style: TextStyle(color: Colors.yellow, fontSize: 14),
+                      ),
                     ),
                   ),
                 ),
