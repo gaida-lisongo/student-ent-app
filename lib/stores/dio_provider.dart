@@ -11,18 +11,7 @@ final dioProvider = Provider((ref) {
     ),
   );
 
-  dio.interceptors.add(
-    InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        const storage = FlutterSecureStorage();
-        final token = await storage.read(key: 'auth_token');
-        if (token != null) {
-          options.headers['Authorization'] = 'Bearer $token';
-        }
-        return handler.next(options);
-      },
-    ),
-  );
+
 
   return dio;
 });
