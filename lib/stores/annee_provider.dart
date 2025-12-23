@@ -4,13 +4,17 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:student_app/model/annee_model.dart';
-import 'package:student_app/stores/dio_prodiver.dart';
+import 'package:student_app/stores/auth_provider.dart';
+import 'package:student_app/stores/dio_provider.dart';
 
 class AnneeAsyncNotifier extends AsyncNotifier<Annee?> {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
-  late final Dio _dio;
+  late Dio _dio;
   @override
   Future<Annee?> build() async {
+    // Watch auth state to force reload
+    ref.watch(authProvider);
+
     _dio = ref.read(dioProvider);
     final jsonString = await _storage.read(key: 'annee');
     if (jsonString != null) {

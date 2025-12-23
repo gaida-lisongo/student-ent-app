@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/model/recharge_model.dart';
 import 'package:student_app/model/student_model.dart';
-import 'package:student_app/stores/dio_prodiver.dart';
+import 'package:student_app/stores/dio_provider.dart';
 import 'package:student_app/stores/student_provider.dart';
 
 class RechargeAsyncNotifier extends AsyncNotifier<List<Recharge>> {

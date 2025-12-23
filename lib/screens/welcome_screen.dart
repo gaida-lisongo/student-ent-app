@@ -12,7 +12,7 @@ class WelcomeScreen extends ConsumerWidget {
   const WelcomeScreen({super.key});
 
   // URL de simulation fournie
-  static const String simulationUrl = '/parcours/6926d4e09c74cc9b8856a323';
+  static const String simulationUrl = '/parcours/6926d4e09c74cc9b8856a318';
 
   // Fonction pour gérer le résultat du scan (ou de la simulation)
   void handleAuthScanResult(
@@ -58,9 +58,6 @@ class WelcomeScreen extends ConsumerWidget {
         final etudiantNotifier = ref.read(etudiantProvider.notifier);
         // Sauvegarder l'étudiant localement
         await etudiantNotifier.setEtudiant(inscription.etudiant);
-
-        // Invalider les providers pour qu'ils se rechargent
-        ref.invalidate(anneeProvider);
 
         // Succès
         ScaffoldMessenger.of(context).showSnackBar(

@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:student_app/stores/dio_prodiver.dart';
+import 'package:student_app/stores/dio_provider.dart';
 
 class AuthAsyncNotifier extends AsyncNotifier<String?> {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();

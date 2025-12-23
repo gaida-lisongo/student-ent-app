@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:student_app/model/charge_model.dart';
-import 'package:student_app/stores/dio_prodiver.dart';
+import 'package:student_app/stores/dio_provider.dart';
 
 class MatiereProvider extends StateNotifier<Charge> {
   MatiereProvider(this.ref) : super(Charge.empty());

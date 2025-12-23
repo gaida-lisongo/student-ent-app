@@ -3,12 +3,15 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:student_app/model/promotion_model.dart';
+import 'package:student_app/stores/auth_provider.dart';
 
 class PromotionNotifier extends AsyncNotifier<Promotion?> {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   @override
   Future<Promotion?> build() async {
+    // Watch auth state to force reload
+    ref.watch(authProvider);
     try {
       final jsonString = await _storage.read(key: 'promotion');
 

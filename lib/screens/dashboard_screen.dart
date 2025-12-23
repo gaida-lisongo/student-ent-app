@@ -989,36 +989,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
           return rechargeAsync.when(
             data: (recharges) {
-              if (recharges.isEmpty) {
-                return Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Aucune recharge trouvée',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  ),
-                );
-              }
-
-              // Calculer les métriques
+              // 1. Calculer les métriques (même si la liste est vide, ce sera des zéros)
               final metrics = _calculateRechargeMetrics(recharges);
 
-              // Prendre seulement les 5 dernières recharges
+              // 2. Préparer la liste des 5 dernières (peut être vide)
               final last5Recharges = recharges.take(5).toList();
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Métriques des recharges
+                  // --- A. Métriques (Toujours visibles) ---
                   rechargeMetricsCard(metrics),
                   const SizedBox(height: 16),
 
-                  // Section avec titre et boutons
+                  // --- B. En-tête et Boutons (Toujours visibles) ---
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1039,6 +1023,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           IconButton(
                             onPressed: _showNewRechargeModal,
                             icon: const Icon(Icons.add),
+                            // container decoration for emphasis?
+                            style: IconButton.styleFrom(
+                                backgroundColor: Colors.black,
+                                foregroundColor: Colors.white),
                             tooltip: 'Nouvelle recharge',
                           ),
                         ],
@@ -1047,28 +1035,61 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Liste des 5 dernières recharges
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: last5Recharges.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final recharge = last5Recharges[index];
-                      return RechargeCard(recharge: recharge);
-                    },
-                  ),
-
-                  // Bouton voir plus si il y a plus de 5 recharges
-                  if (recharges.length > 5) ...[
-                    const SizedBox(height: 16),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => _showAllRechargesModal(recharges),
-                        child: Text('Voir toutes (${recharges.length})'),
+                  // --- C. Contenu Conditionnel (Liste ou Empty State) ---
+                  if (recharges.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(30),
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[200]!),
                       ),
+                      child: Column(
+                        children: [
+                          Icon(Icons.receipt_long_outlined,
+                              size: 40, color: Colors.grey[400]),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Aucune recharge trouvée',
+                            style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                                fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(height: 5),
+                          const Text(
+                            'Cliquez sur + pour effectuer votre première recharge.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  else ...[
+                    // Liste des 5 dernières recharges
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: last5Recharges.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final recharge = last5Recharges[index];
+                        return RechargeCard(recharge: recharge);
+                      },
                     ),
+
+                    // Bouton voir plus si il y a plus de 5 recharges
+                    if (recharges.length > 5) ...[
+                      const SizedBox(height: 16),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => _showAllRechargesModal(recharges),
+                          child: Text('Voir toutes (${recharges.length})'),
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               );

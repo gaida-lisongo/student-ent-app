@@ -7,14 +7,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:student_app/model/student_model.dart';
-import 'package:student_app/stores/dio_prodiver.dart';
+import 'package:student_app/stores/auth_provider.dart';
+import 'package:student_app/stores/dio_provider.dart';
 
 class EtudiantNotifier extends AsyncNotifier<Etudiant?> {
-  late final Dio _dio;
+  late Dio _dio;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   @override
   Future<Etudiant?> build() async {
+    // Watch auth state to rebuild when user logs in/out
+    ref.watch(authProvider);
+
     try {
       _dio = ref.read(dioProvider);
       final jsonString = await _storage.read(key: 'etudiant');
