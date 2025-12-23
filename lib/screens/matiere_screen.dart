@@ -13,6 +13,8 @@ import 'package:student_app/stores/promotion_provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:student_app/screens/scanner_screen.dart';
 import 'package:student_app/stores/student_provider.dart';
+import 'package:student_app/widgets/payment_bottom_sheet.dart';
+import 'package:student_app/screens/activity_screen.dart';
 
 class MatiereScreen extends ConsumerStatefulWidget {
   final Matiere matiere;
@@ -859,104 +861,137 @@ class _MatiereScreenState extends ConsumerState<MatiereScreen> {
       itemCount: activities.length,
       itemBuilder: (context, index) {
         final activity = activities[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 15),
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                blurRadius: 5,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      activity.title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getActivityTypeColor(activity.type),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      activity.type.toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                activity.description,
-                style: const TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.grade, size: 16, color: Colors.amber[700]),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Note max: ${activity.maximumScore}',
+        return InkWell(
+          onTap: () => _openActivity(activity),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 15),
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        activity.title,
                         style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      _submitActivityResolution(activity.title);
-                    },
-                    icon: const Icon(Icons.upload_file, size: 16),
-                    label: const Text(
-                      'Soumettre',
-                      style: TextStyle(fontSize: 12),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+                    Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                        horizontal: 8,
+                        vertical: 4,
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
+                      decoration: BoxDecoration(
+                        color: _getActivityTypeColor(activity.type),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        activity.type.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  activity.description,
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.grade, size: 16, color: Colors.amber[700]),
+                        const SizedBox(width: 5),
+                        Text(
+                          'Note max: ${activity.maximumScore}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (activity.transaction != null)
+                     Container(
+                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                       decoration: BoxDecoration(
+                         color: Colors.orange.withOpacity(0.1),
+                         borderRadius: BorderRadius.circular(8),
+                         border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                       ),
+                       child: Row(
+                         children: [
+                           Icon(Icons.monetization_on, size: 14, color: Colors.orange[800]),
+                           const SizedBox(width: 4),
+                           Text(
+                             '${activity.transaction!.amount} FC',
+                             style: TextStyle(fontSize: 12, color: Colors.orange[900], fontWeight: FontWeight.bold),
+                           ),
+                         ],
+                       ),
+                     ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
+    );
+  }
+
+  void _openActivity(dynamic activity) {
+    // Check for transaction
+    if (activity.transaction != null) {
+      final student = ref.read(etudiantProvider).value;
+      if (student != null) {
+        final isSubscribed = activity.transaction!.subscriptions
+            .any((s) => s.studentId == student.id);
+            
+        if (!isSubscribed) {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => PaymentBottomSheet(
+              activity: activity,
+              transaction: activity.transaction!,
+              student: student,
+            ),
+          );
+          return;
+        }
+      }
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ActivityScreen(activity: activity),
+      ),
     );
   }
 

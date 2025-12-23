@@ -1,3 +1,5 @@
+import 'package:student_app/model/activity_model.dart';
+
 class Presence {
   final String id;
   final String student;
@@ -18,7 +20,7 @@ class Presence {
   factory Presence.fromJson(Map<String, dynamic> json) {
     return Presence(
       id: json['_id'] as String,
-      student: json['student'] as String,
+      student: json['student'] is Map ? json['student']['_id'] as String : json['student'] as String,
       location: json['location'] as String,
       status: json['status'] as String,
       createdAt: json['createdAt'] != null
@@ -53,6 +55,7 @@ class Seance {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final List<Presence> presences;
+  final List<Activity> activities;
 
   Seance({
     required this.id,
@@ -65,6 +68,7 @@ class Seance {
     this.createdAt,
     this.updatedAt,
     required this.presences,
+    this.activities = const [],
   });
 
   factory Seance.fromJson(Map<String, dynamic> json) {
@@ -82,9 +86,12 @@ class Seance {
       updatedAt: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'] as String)
           : null,
-      presences:
-          (json['presences'] as List<dynamic>?)
+      presences: (json['presences'] as List<dynamic>?)
               ?.map((i) => Presence.fromJson(i as Map<String, dynamic>))
+              .toList() ??
+          [],
+      activities: (json['activities'] as List<dynamic>?)
+              ?.map((i) => Activity.fromJson(i as Map<String, dynamic>))
               .toList() ??
           [],
     );
@@ -101,7 +108,8 @@ class Seance {
       'description': description,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
-      'presences': presences,
+      'presences': presences.map((p) => p.toJson()).toList(),
+      'activities': activities.map((e) => e.toJson()).toList(),
     };
   }
 }
