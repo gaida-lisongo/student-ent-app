@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/components/custom_button.dart';
 import 'package:student_app/components/recharge_card.dart';
-import 'package:student_app/model/annee_model.dart';
-import 'package:student_app/model/promotion_model.dart';
 import 'package:student_app/model/recharge_model.dart';
 import 'package:student_app/model/student_model.dart';
 import 'package:student_app/stores/annee_provider.dart';
@@ -11,13 +9,6 @@ import 'package:student_app/stores/auth_provider.dart';
 import 'package:student_app/stores/promotion_provider.dart';
 import 'package:student_app/stores/recharge_provider.dart';
 import 'package:student_app/stores/student_provider.dart';
-// import 'package:student_app/components/button_row.dart';
-// import 'package:student_app/components/transaction_card.dart';
-// import 'package:student_app/components/recharge_bottom_sheet.dart';
-// import 'package:student_app/model/student_model.dart';
-// import 'package:student_app/model/transaction_model.dart';
-// import 'package:student_app/stores/auth_provider.dart';
-// import 'package:student_app/stores/student_provider.dart';
 
 // 1. Service d'Avatar Simulé (inchangé)
 class AvatarService {
@@ -1025,8 +1016,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             icon: const Icon(Icons.add),
                             // container decoration for emphasis?
                             style: IconButton.styleFrom(
-                                backgroundColor: Colors.black,
-                                foregroundColor: Colors.white),
+                              backgroundColor: Colors.black,
+                              foregroundColor: Colors.white,
+                            ),
                             tooltip: 'Nouvelle recharge',
                           ),
                         ],
@@ -1047,15 +1039,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
                       child: Column(
                         children: [
-                          Icon(Icons.receipt_long_outlined,
-                              size: 40, color: Colors.grey[400]),
+                          Icon(
+                            Icons.receipt_long_outlined,
+                            size: 40,
+                            color: Colors.grey[400],
+                          ),
                           const SizedBox(height: 10),
                           const Text(
                             'Aucune recharge trouvée',
                             style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey,
-                                fontWeight: FontWeight.w500),
+                              fontSize: 16,
+                              color: Colors.grey,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                           const SizedBox(height: 5),
                           const Text(

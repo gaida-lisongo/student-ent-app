@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/stores/auth_provider.dart';
-import 'package:student_app/stores/recharge_provider.dart';
-import 'package:student_app/screens/payment_status_page.dart';
 import 'package:student_app/components/custom_button.dart';
 import 'package:student_app/services/transaction_service.dart';
 
@@ -48,13 +46,11 @@ class _RechargeBottomSheetState extends ConsumerState<RechargeBottomSheet> {
   // Générer la description avec matricule:promotion
   String _generateDescription() {
     final authState = ref.read(authProvider);
-    if (authState.user == null) return '';
-
-    final user = authState.user!;
-    final etudiant = user.etudiant;
-    final promotion = user.promotion;
-
-    return 'Recharge de compte - ${etudiant.nom} ${etudiant.postNom} ${etudiant.prenom}:${etudiant.matricule}';
+    return authState.when(
+      data: (user) => user != null ? 'Recharge de compte - ${user}' : '',
+      loading: () => '',
+      error: (_, __) => '',
+    );
   }
 
   // Soumettre la recharge
@@ -70,7 +66,14 @@ class _RechargeBottomSheetState extends ConsumerState<RechargeBottomSheet> {
     }
 
     final authState = ref.read(authProvider);
-    if (authState.user == null) {
+    String? userId;
+    authState.when(
+      data: (user) => userId = user,
+      loading: () => userId = null,
+      error: (_, __) => userId = null,
+    );
+    
+    if (userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Utilisateur non authentifié'),
@@ -87,19 +90,14 @@ class _RechargeBottomSheetState extends ConsumerState<RechargeBottomSheet> {
     try {
       final amount = int.parse(_amountController.text);
       final phone = _processPhoneNumber(_phoneController.text);
-      // final description = _generateDescription(); // Si utilisé
-      final etudiantId = authState.user!.etudiant.id;
-
-      // 1. Obtenir la fonction d'action Riverpod (ref.read)
-      final createAction = ref.read(createRechargeActionProvider);
-
-      // 2. Appeler la fonction d'action qui gère l'API et la mise à jour du store
-      final transaction = await createAction(
-        etudiantId: etudiantId,
+      
+      // Créer la recharge via le service
+      final transactionService = TransactionService();
+      await transactionService.createRecharge(
+        etudiantId: userId,
         amount: amount,
         phone: phone,
-        description:
-            _generateDescription(), // Appel de la description si nécessaire
+        description: 'Recharge de compte'
         currency: 'CDF',
         paymentMethod: 'mobile_money',
       );
@@ -164,44 +162,41 @@ class _RechargeBottomSheetState extends ConsumerState<RechargeBottomSheet> {
               const SizedBox(height: 20),
 
               // Informations utilisateur
-              if (authState.user != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(12.0),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${authState.user!.etudiant.nom} ${authState.user!.etudiant.postNom} ${authState.user!.etudiant.prenom}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Matricule: ${authState.user!.etudiant.matricule}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Promotion: ${authState.user!.promotion.designation}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
+              Consumer(
+                builder: (context, ref, child) {
+                  return authState.when(
+                    data: (user) {
+                      if (user == null) return const SizedBox.shrink();
+                      return Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12.0),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8.0),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Utilisateur: $user',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                      );
+                    },
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  );
+                },
+              ),
 
               // Champ Montant
               const Text(
