@@ -19,29 +19,65 @@ class MatiereProvider extends StateNotifier<Charge> {
 
   Future<void> fetchRecharge(String matiereId, String anneeId) async {
     try {
+      print('🔄 Fetching charge pour cours: $matiereId, année: $anneeId');
+
       final response = await _dio.get(
         '/charges?coursId=$matiereId&anneeId=$anneeId',
       );
 
-      if (response.statusCode == 200) {
-        final responseData = response.data as Map<String, dynamic>;
+      print('📥 Réponse reçue - Status: ${response.statusCode}');
 
-        // Vérifier si la réponse contient le champ 'data' et 'success'
-        if (responseData['success'] == true && responseData['data'] != null) {
-          final charge = Charge.fromJson(
-            responseData['data'] as Map<String, dynamic>,
-          );
-          state = charge;
+      if (response.statusCode == 200) {
+        final responseData = response.data;
+
+        print('📄 Type de données: ${responseData.runtimeType}');
+        print('📄 Contenu: $responseData');
+
+        if (responseData is Map<String, dynamic>) {
+          // Vérifier si la réponse contient le champ 'data' et 'success'
+          if (responseData['success'] == true && responseData['data'] != null) {
+            print('✅ Format de réponse valide avec success=true');
+
+            final chargeData = responseData['data'];
+            print('📊 Données de charge: $chargeData');
+
+            if (chargeData is Map<String, dynamic>) {
+              final charge = Charge.fromJson(chargeData);
+              state = charge;
+              print('✅ Charge chargée avec succès: ${charge.id}');
+            } else {
+              throw Exception(
+                'Les données de charge ne sont pas au bon format: ${chargeData.runtimeType}',
+              );
+            }
+          } else {
+            throw Exception(
+              'Format de réponse invalide - success: ${responseData['success']}, data: ${responseData['data']}',
+            );
+          }
         } else {
-          throw Exception('Format de réponse invalide');
+          // Si la réponse n'est pas encapsulée dans un objet avec 'success'
+          print('ℹ️ Réponse directe sans wrapper success');
+          if (responseData is Map<String, dynamic>) {
+            final charge = Charge.fromJson(
+              responseData as Map<String, dynamic>,
+            );
+            state = charge;
+            print('✅ Charge chargée directement avec succès: ${charge.id}');
+          } else {
+            throw Exception(
+              'Format de réponse inattendu: ${responseData.runtimeType}',
+            );
+          }
         }
       } else {
         throw Exception(
-          'Erreur lors du chargement de la matière: ${response.statusCode}',
+          'Erreur HTTP lors du chargement de la charge: ${response.statusCode}',
         );
       }
-    } catch (e) {
-      print('Erreur fetchRecharge: $e');
+    } catch (e, stackTrace) {
+      print('❌ Erreur fetchRecharge: $e');
+      print('📍 StackTrace: $stackTrace');
       rethrow;
     }
   }

@@ -46,23 +46,25 @@ class Enseignant {
   }
 
   factory Enseignant.fromJson(Map<String, dynamic> json) {
-    return Enseignant(
-      id: json['_id'] as String,
-      nom: json['nom'] as String,
-      postNom: json['post_nom'] as String,
-      sexe: json['sexe'] as String,
-      matricule: json['matricule'] as String,
-      grade: json['grade'] as String,
-      prenom: json['prenom'] as String,
-      email: json['email'] as String? ?? '',
-      telephone: json['telephone'] as String? ?? '',
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : null,
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'] as String)
-          : null,
-    );
+    try {
+      return Enseignant(
+        id: json['_id']?.toString() ?? '',
+        nom: JsonParsingUtils.safeGetString(json, 'nom'),
+        postNom: JsonParsingUtils.safeGetString(json, 'post_nom'),
+        sexe: JsonParsingUtils.safeGetString(json, 'sexe'),
+        matricule: JsonParsingUtils.safeGetString(json, 'matricule'),
+        grade: JsonParsingUtils.safeGetString(json, 'grade'),
+        prenom: JsonParsingUtils.safeGetString(json, 'prenom'),
+        email: JsonParsingUtils.safeGetString(json, 'email'),
+        telephone: JsonParsingUtils.safeGetString(json, 'telephone'),
+        createdAt: JsonParsingUtils.safeParseDateTime(json['createdAt']),
+        updatedAt: JsonParsingUtils.safeParseDateTime(json['updatedAt']),
+      );
+    } catch (e) {
+      print('Erreur lors du parsing d\'Enseignant: $e');
+      print('JSON reçu: $json');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -115,22 +117,24 @@ class Promotion {
   }
 
   factory Promotion.fromJson(Map<String, dynamic> json) {
-    return Promotion(
-      id: json['_id'] as String,
-      designation: json['designation'] as String? ?? '',
-      systeme: json['systeme'] as String? ?? '',
-      niveau: json['niveau'] as String? ?? '',
-      cycle: json['cycle'] as String? ?? '',
-      semestres: json['semestres'] != null
-          ? List<String>.from(json['semestres'])
-          : [],
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : null,
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'] as String)
-          : null,
-    );
+    try {
+      return Promotion(
+        id: json['_id']?.toString() ?? '',
+        designation: JsonParsingUtils.safeGetString(json, 'designation'),
+        systeme: JsonParsingUtils.safeGetString(json, 'systeme'),
+        niveau: JsonParsingUtils.safeGetString(json, 'niveau'),
+        cycle: JsonParsingUtils.safeGetString(json, 'cycle'),
+        semestres: json['semestres'] != null
+            ? JsonParsingUtils.safeParseStringList(json['semestres'])
+            : [],
+        createdAt: JsonParsingUtils.safeParseDateTime(json['createdAt']),
+        updatedAt: JsonParsingUtils.safeParseDateTime(json['updatedAt']),
+      );
+    } catch (e) {
+      print('Erreur lors du parsing de Promotion: $e');
+      print('JSON reçu: $json');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -210,55 +214,46 @@ class Charge {
   }
 
   factory Charge.fromJson(Map<String, dynamic> json) {
-    return Charge(
-      id: json['_id'] as String,
-      cours: Matiere.fromJson(json['cours'] as Map<String, dynamic>),
-      anneeId: Annee.fromJson(json['anneeId'] as Map<String, dynamic>),
-      promotionId: json['promotionId'] != null
-          ? Promotion.fromJson(json['promotionId'] as Map<String, dynamic>)
-          : null,
-      enseignant: Enseignant.fromJson(
-        json['enseignant'] as Map<String, dynamic>,
-      ),
-      status: json['status'] as String? ?? '',
-      evaluation: json['evaluation'] as String? ?? '',
-      objectif: json['objectif'] as String? ?? '',
-      methodologie: json['methodologie'] as String? ?? '',
-      contenu: json['contenu'] as String? ?? '',
-      references: json['references'] as String? ?? '',
-      activities: json['activities'] != null
-          ? (json['activities'] as List<dynamic>)
-                .map(
-                  (activityJson) =>
-                      Activity.fromJson(activityJson as Map<String, dynamic>),
-                )
-                .toList()
-          : [],
-      seances: json['seances'] != null
-          ? (json['seances'] as List<dynamic>)
-                .map(
-                  (seanceJson) =>
-                      Seance.fromJson(seanceJson as Map<String, dynamic>),
-                )
-                .toList()
-          : [],
-      ressources: json['ressources'] != null
-          ? (json['ressources'] as List<dynamic>)
-                .map(
-                  (ressourceJson) =>
-                      Ressource.fromJson(ressourceJson as Map<String, dynamic>),
-                )
-                .toList()
-          : [],
-      recours: json['recours'] as List<dynamic>? ?? [],
-      plannings: json['plannings'] as List<dynamic>? ?? [],
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : null,
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'] as String)
-          : null,
-    );
+    try {
+      return Charge(
+        id: json['_id']?.toString() ?? '',
+        cours: json['cours'] != null
+            ? Matiere.fromJson(json['cours'] as Map<String, dynamic>)
+            : Matiere.empty(),
+        anneeId: json['anneeId'] != null
+            ? Annee.fromJson(json['anneeId'] as Map<String, dynamic>)
+            : Annee.empty(),
+        promotionId: json['promotionId'] != null
+            ? Promotion.fromJson(json['promotionId'] as Map<String, dynamic>)
+            : null,
+        enseignant: json['enseignant'] != null
+            ? Enseignant.fromJson(json['enseignant'] as Map<String, dynamic>)
+            : Enseignant.empty(),
+        status: JsonParsingUtils.safeGetString(json, 'status'),
+        evaluation: JsonParsingUtils.safeGetString(json, 'evaluation'),
+        objectif: JsonParsingUtils.safeGetString(json, 'objectif'),
+        methodologie: JsonParsingUtils.safeGetString(json, 'methodologie'),
+        contenu: JsonParsingUtils.safeGetString(json, 'contenu'),
+        references: JsonParsingUtils.safeGetString(json, 'references'),
+        activities: json['activities'] != null
+            ? JsonParsingUtils.safeParseActivities(json['activities'])
+            : [],
+        seances: json['seances'] != null
+            ? JsonParsingUtils.safeParseSeances(json['seances'])
+            : [],
+        ressources: json['ressources'] != null
+            ? JsonParsingUtils.safeParseRessources(json['ressources'])
+            : [],
+        recours: json['recours'] as List<dynamic>? ?? [],
+        plannings: json['plannings'] as List<dynamic>? ?? [],
+        createdAt: JsonParsingUtils.safeParseDateTime(json['createdAt']),
+        updatedAt: JsonParsingUtils.safeParseDateTime(json['updatedAt']),
+      );
+    } catch (e) {
+      print('Erreur lors du parsing de Charge: $e');
+      print('JSON reçu: $json');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -282,5 +277,133 @@ class Charge {
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };
+  }
+}
+
+// Méthodes utilitaires partagées pour le parsing JSON
+class JsonParsingUtils {
+  // Méthode utilitaire pour extraire une chaîne de façon sécurisée
+  static String safeGetString(Map<String, dynamic> json, String key) {
+    final value = json[key];
+    if (value == null) return '';
+    if (value is String) return value;
+    if (value is Map || value is List) {
+      print(
+        'Attention: $key devrait être une String mais contient: ${value.runtimeType}',
+      );
+      return '';
+    }
+    return value.toString();
+  }
+
+  // Méthode utilitaire pour parser les dates
+  static DateTime? safeParseDateTime(dynamic dateValue) {
+    if (dateValue == null) return null;
+    try {
+      if (dateValue is String) return DateTime.parse(dateValue);
+      return null;
+    } catch (e) {
+      print('Erreur parsing date: $dateValue');
+      return null;
+    }
+  }
+
+  static List<String> safeParseStringList(dynamic value) {
+    try {
+      if (value is List) {
+        return value.map((item) => item?.toString() ?? '').toList();
+      }
+      return [];
+    } catch (e) {
+      print('Erreur parsing string list: $e');
+      return [];
+    }
+  }
+
+  // Méthodes pour parser les listes d'objets spécifiques
+  static List<Activity> safeParseActivities(dynamic activities) {
+    print('🏃 Début parsing activities');
+    print('📊 Type d\'activités reçu: ${activities.runtimeType}');
+
+    try {
+      if (activities == null) {
+        print('⚠️ Activities est null');
+        return [];
+      }
+
+      if (activities is List<dynamic>) {
+        print('✅ Activities est une liste de ${activities.length} éléments');
+
+        final validActivities = activities.where((item) {
+          final isValid = item is Map<String, dynamic>;
+          if (!isValid) {
+            print('⚠️ Élément ignoré - type: ${item.runtimeType}');
+          }
+          return isValid;
+        }).toList();
+
+        print('📊 ${validActivities.length} activités valides trouvées');
+
+        final parsedActivities = validActivities.map((activityJson) {
+          try {
+            final activity = Activity.fromJson(
+              activityJson as Map<String, dynamic>,
+            );
+            print('✅ Activité parsée: ${activity.title}');
+            return activity;
+          } catch (e) {
+            print('❌ Erreur parsing activité: $e');
+            print('📊 JSON problématique: $activityJson');
+            rethrow;
+          }
+        }).toList();
+
+        print('🎉 ${parsedActivities.length} activités parsées avec succès');
+        return parsedActivities;
+      } else {
+        print('❌ Activities n\'est pas une liste: ${activities.runtimeType}');
+        return [];
+      }
+    } catch (e) {
+      print('❌ Erreur parsing activities: $e');
+      print('📊 Données problématiques: $activities');
+      return [];
+    }
+  }
+
+  static List<Seance> safeParseSeances(dynamic seances) {
+    try {
+      if (seances is List<dynamic>) {
+        return seances
+            .where((item) => item is Map<String, dynamic>)
+            .map(
+              (seanceJson) =>
+                  Seance.fromJson(seanceJson as Map<String, dynamic>),
+            )
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('Erreur parsing seances: $e');
+      return [];
+    }
+  }
+
+  static List<Ressource> safeParseRessources(dynamic ressources) {
+    try {
+      if (ressources is List<dynamic>) {
+        return ressources
+            .where((item) => item is Map<String, dynamic>)
+            .map(
+              (ressourceJson) =>
+                  Ressource.fromJson(ressourceJson as Map<String, dynamic>),
+            )
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('Erreur parsing ressources: $e');
+      return [];
+    }
   }
 }

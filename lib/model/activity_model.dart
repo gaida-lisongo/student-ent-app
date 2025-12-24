@@ -14,17 +14,42 @@ class Resolution {
   });
 
   factory Resolution.fromJson(Map<String, dynamic> json) {
-    return Resolution(
-      id: json['_id'] as String,
-      student: json['student'] as String,
-      score: (json['score'] as num).toDouble(),
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : null,
-      dateSubmited: json['dateSubmited'] != null
-          ? DateTime.parse(json['dateSubmited'] as String)
-          : null,
-    );
+    try {
+      return Resolution(
+        id: json['_id']?.toString() ?? '',
+        student: _parseStudentField(json['student']),
+        score: (json['score'] as num?)?.toDouble() ?? 0.0,
+        createdAt: _safeParseDateTime(json['createdAt']),
+        dateSubmited: _safeParseDateTime(
+          json['dateSubmitted'] ?? json['dateSubmited'],
+        ),
+      );
+    } catch (e) {
+      print('❌ Erreur parsing Resolution: $e');
+      print('📊 JSON: $json');
+      rethrow;
+    }
+  }
+
+  static String _parseStudentField(dynamic student) {
+    if (student == null) return '';
+    if (student is String) return student;
+    if (student is Map<String, dynamic>) {
+      // Si c'est un objet étudiant, prendre l'ID
+      return student['_id']?.toString() ?? '';
+    }
+    return student.toString();
+  }
+
+  static DateTime? _safeParseDateTime(dynamic dateValue) {
+    if (dateValue == null) return null;
+    try {
+      if (dateValue is String) return DateTime.parse(dateValue);
+      return null;
+    } catch (e) {
+      print('Erreur parsing date: $dateValue');
+      return null;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -77,7 +102,9 @@ class Activity {
                 .toList()
           : null,
       transaction: json['transaction'] != null
-          ? ActivityTransaction.fromJson(json['transaction'] as Map<String, dynamic>)
+          ? ActivityTransaction.fromJson(
+              json['transaction'] as Map<String, dynamic>,
+            )
           : null,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
@@ -118,15 +145,22 @@ class ActivityTransaction {
   });
 
   factory ActivityTransaction.fromJson(Map<String, dynamic> json) {
-    return ActivityTransaction(
-      id: json['_id'] as String,
-      amount: json['amount'] as int? ?? 0,
-      status: json['status'] as String? ?? 'Pending',
-      subscriptions: (json['subscriptions'] as List<dynamic>?)
-              ?.map((e) => Subscription.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-    );
+    try {
+      return ActivityTransaction(
+        id: json['_id']?.toString() ?? '',
+        amount: (json['amount'] as num?)?.toInt() ?? 0,
+        status: json['status']?.toString() ?? 'Pending',
+        subscriptions:
+            (json['subscriptions'] as List<dynamic>?)
+                ?.map((e) => Subscription.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+      );
+    } catch (e) {
+      print('❌ Erreur parsing ActivityTransaction: $e');
+      print('📊 JSON: $json');
+      rethrow;
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -167,10 +201,6 @@ class Subscription {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'student': studentId,
-      'lastSolde': lastSolde,
-      'newSolde': newSolde,
-    };
+    return {'student': studentId, 'lastSolde': lastSolde, 'newSolde': newSolde};
   }
 }
