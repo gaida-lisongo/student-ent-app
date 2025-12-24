@@ -4,6 +4,8 @@ import 'package:student_app/model/questionnaire_model.dart';
 import 'package:student_app/stores/settings_provider.dart';
 import 'package:student_app/stores/questionnaire_provider.dart';
 import 'package:student_app/stores/student_provider.dart';
+import 'package:student_app/stores/resource_download_provider.dart';
+import 'package:student_app/widgets/resource_download_widget.dart';
 
 class DevoirWidget extends ConsumerWidget {
   final DevoirData data;
@@ -11,17 +13,17 @@ class DevoirWidget extends ConsumerWidget {
   final Future<Map<String, dynamic>?> Function(double score) onSubmit;
 
   const DevoirWidget({
-    super.key, 
-    required this.data, 
+    super.key,
+    required this.data,
     required this.activityId,
-    required this.onSubmit
+    required this.onSubmit,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final baseUrl = ref.watch(assetBaseUrlProvider);
 
-    print('devoir: ${data.toJson()}');  
+    print('devoir: ${data.toJson()}');
     final hasUrl = data.url != null && data.url!.isNotEmpty;
 
     return Padding(
@@ -43,42 +45,13 @@ class DevoirWidget extends ConsumerWidget {
             style: TextStyle(fontSize: 16, color: Colors.grey),
           ),
           const SizedBox(height: 40),
-          
+
           if (hasUrl)
-             Card(
-              elevation: 4,
-              child: InkWell(
-                onTap: () {
-                   // TODO: Implement Download/Open Logic
-                   ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Ouverture du fichier... (TODO)')),
-                    );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      Icon(
-                        _getFileIcon(data.typeFile),
-                        size: 48,
-                        color: Colors.red[400],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _getFileName(data.url!),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 16, 
-                          fontWeight: FontWeight.w600,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(data.typeFile ?? "Fichier inconnu", style: TextStyle(color: Colors.grey[600])),
-                    ],
-                  ),
-                ),
-              ),
+            ResourceDownloadWidget(
+              url: data.url!,
+              mimeType: data.typeFile,
+              title: _getFileName(data.url!),
+              description: "Ressource de devoir",
             )
           else
             const Card(
@@ -87,10 +60,10 @@ class DevoirWidget extends ConsumerWidget {
                 child: Text("Aucun fichier associé à ce devoir."),
               ),
             ),
-            
+
           const SizedBox(height: 40),
-          // Usually a "Devoir" might just be "Consulted" or marking as read? 
-          // Or user might need to submit something elsewhere? 
+          // Usually a "Devoir" might just be "Consulted" or marking as read?
+          // Or user might need to submit something elsewhere?
           // JSON implies just retrieval: "l'étudiant n'a qu'à recuérer la ressource"
           ElevatedButton.icon(
             onPressed: () async {
@@ -98,13 +71,19 @@ class DevoirWidget extends ConsumerWidget {
                 await onSubmit(0.0);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Activitié marquée comme vue !"), backgroundColor: Colors.green),
+                    const SnackBar(
+                      content: Text("Activitié marquée comme vue !"),
+                      backgroundColor: Colors.green,
+                    ),
                   );
                 }
               } catch (e) {
-                 if (context.mounted) {
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Erreur lors de la soumission."), backgroundColor: Colors.red),
+                    const SnackBar(
+                      content: Text("Erreur lors de la soumission."),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                 }
               }
@@ -114,7 +93,7 @@ class DevoirWidget extends ConsumerWidget {
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -124,8 +103,24 @@ class DevoirWidget extends ConsumerWidget {
     if (url.isEmpty) return "Document";
     final parts = url.split('/');
     if (parts.isNotEmpty) {
-      // Decode URI component if needed, and maybe strip UUID prefix if present logic exists
-      return parts.last;
+      String fileName = parts.last;
+
+      // Nettoyer le nom de fichier si il contient un UUID au début
+      final uuidPattern = RegExp(
+        r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-',
+      );
+      if (uuidPattern.hasMatch(fileName)) {
+        fileName = fileName.replaceFirst(uuidPattern, '');
+      }
+
+      // Décoder l'URL si nécessaire
+      try {
+        fileName = Uri.decodeComponent(fileName);
+      } catch (e) {
+        // Si le décodage échoue, garder le nom original
+      }
+
+      return fileName.isEmpty ? "Document" : fileName;
     }
     return "Document";
   }
@@ -136,5 +131,36 @@ class DevoirWidget extends ConsumerWidget {
     if (mimeType.contains('image')) return Icons.image;
     if (mimeType.contains('word')) return Icons.description;
     return Icons.insert_drive_file;
+  }
+
+  // Méthode pour télécharger la ressource
+  Future<void> _downloadResource(
+    BuildContext context,
+    WidgetRef ref,
+    String url,
+    String? mimeType,
+  ) async {
+    final baseUrl = ref.read(assetBaseUrlProvider);
+    final downloadNotifier = ref.read(resourceDownloadProvider.notifier);
+
+    await downloadNotifier.downloadResource(
+      url: url,
+      baseUrl: baseUrl,
+      mimeType: mimeType,
+      context: context,
+    );
+
+    // Vérifier s'il y a eu une erreur
+    final downloadState = ref.read(resourceDownloadProvider);
+    if (downloadState.error != null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de téléchargement: ${downloadState.error}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
