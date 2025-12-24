@@ -25,7 +25,6 @@ class MatiereProvider extends StateNotifier<Charge> {
 
       if (response.statusCode == 200) {
         final responseData = response.data as Map<String, dynamic>;
-        print('Charge data fetched: $responseData');
 
         // Vérifier si la réponse contient le champ 'data' et 'success'
         if (responseData['success'] == true && responseData['data'] != null) {
